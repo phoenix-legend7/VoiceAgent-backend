@@ -1,0 +1,36 @@
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from io import BytesIO
+import json, httpx, os
+
+from app.utils.httpx import httpx_client
+from app.schemas import AgentGet
+
+router = APIRouter()
+
+class ChatRequest(BaseModel):
+    messages: list[dict]
+    agent: AgentGet
+
+@router.post("/completions")
+async def chat(chat_request: ChatRequest):
+    try:
+        agent = chat_request.agent.model_dump()
+        data = {
+            "messages": chat_request.messages,
+            "agent": {
+                "agent_id": agent.get("id"),
+                "agent_config": agent.get("config"),
+                "metadata": None,
+                "include_metadata_in_prompt": None
+            },
+            "end_of_session": False
+        }
+        response = await httpx_client.post("/chat/completions", json=data, stream=True)
+
+        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
