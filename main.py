@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from mangum import Mangum
 
 from app.core.config import settings
 from app.routers.api import api_router
@@ -24,3 +25,5 @@ app.include_router(api_router)
 @app.get("/")
 async def root():
     return {"message": "Welcome to Millis-AI API"}
+
+handler = Mangum(app)
