@@ -1,47 +1,87 @@
-from fastapi import APIRouter
-import json
+from fastapi import APIRouter, HTTPException
+import json, httpx
 
-from app.utils.httpx import httpx_client
 from app.schemas import AgentCreate, AgentUpdate
+from app.utils.httpx import get_httpx_headers, httpx_base_url
 
 router = APIRouter()
 
 @router.get("/")
 async def get_agent():
-    agents = await httpx_client.get("/agents")
-    return agents
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = get_httpx_headers()
+            response = await client.get(f"{httpx_base_url}/agents", headers=headers)
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/")
 async def create_agent(agent: AgentCreate):
-    response = await httpx_client.post("/agents", data=json.dumps(agent.model_dump()))
-    return response
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = get_httpx_headers()
+            response = await client.post(f"{httpx_base_url}/agents", data=json.dumps(agent.model_dump()), headers=headers)
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{agent_id}")
 async def get_agent_by_id(agent_id: str):
-    response = await httpx_client.get(f"/agents/{agent_id}")
-    return response
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = get_httpx_headers()
+            response = await client.get(f"{httpx_base_url}/agents/{agent_id}", headers=headers)
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{agent_id}")
 async def update_agent(agent_id: str, agent: AgentUpdate):
-    response = await httpx_client.put(f"/agents/{agent_id}", data=json.dumps(agent.model_dump()))
-    return response
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = get_httpx_headers()
+            response = await client.put(f"{httpx_base_url}/agents/{agent_id}", data=json.dumps(agent.model_dump()), headers=headers)
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{agent_id}")
 async def delete_agent(agent_id: str):
-    response = await httpx_client.delete(f"/agents/{agent_id}")
-    return response
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = get_httpx_headers()
+            response = await client.delete(f"{httpx_base_url}/agents/{agent_id}", headers=headers)
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{agent_id}/duplicate")
 async def duplicate_agent(agent_id: str):
-    response = await httpx_client.post(f"/agents/{agent_id}/duplicate")
-    return response
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = get_httpx_headers()
+            response = await client.post(f"{httpx_base_url}/agents/{agent_id}/duplicate", headers=headers)
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{agent_id}/call-histories")
 async def get_call_histories(agent_id: str):
-    response = await httpx_client.get(f"/agents/{agent_id}/call-histories")
-    return response
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = get_httpx_headers()
+            response = await client.get(f"{httpx_base_url}/agents/{agent_id}/call-histories", headers=headers)
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{agent_id}/embed")
 async def set_embed_config(agent_id: str, embed_config: dict):
-    response = await httpx_client.post(f"/agents/{agent_id}/embed", json=embed_config)
-    return response
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = get_httpx_headers()
+            response = await client.post(f"{httpx_base_url}/agents/{agent_id}/embed", json=embed_config, headers=headers)
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
