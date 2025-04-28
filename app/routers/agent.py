@@ -67,11 +67,11 @@ async def duplicate_agent(agent_id: str):
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{agent_id}/call-histories")
-async def get_call_histories(agent_id: str):
+async def get_call_histories(agent_id: str, start_at: float, limit: int):
     async with httpx.AsyncClient() as client:
         try:
             headers = get_httpx_headers()
-            response = await client.get(f"{httpx_base_url}/agents/{agent_id}/call-histories", headers=headers)
+            response = await client.get(f"{httpx_base_url}/agents/{agent_id}/call-histories", headers=headers, params={ "start_at": start_at, "limit": limit })
             return response.json()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))

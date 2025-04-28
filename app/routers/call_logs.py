@@ -1,6 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
-from io import BytesIO
 import httpx
 
 from app.utils.httpx import get_httpx_headers, httpx_base_url
@@ -13,8 +11,8 @@ async def get_call_log(session_id: str):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.get(f"{httpx_base_url}/call-logs/{session_id}", headers=headers)
+            return response.json()
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:
@@ -26,8 +24,8 @@ async def delete_call_log(session_id: str):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.delete(f"{httpx_base_url}/call-logs/{session_id}", headers=headers)
+            return response.json()
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:

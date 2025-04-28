@@ -1,7 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from io import BytesIO
 import httpx
 
 from app.utils.httpx import get_httpx_headers, httpx_base_url
@@ -40,8 +38,8 @@ async def register_call(register_call_request: RegisterCallRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/register_call", json=data, headers=headers)
+            return response.json()
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:
@@ -63,8 +61,8 @@ async def register_sip_call(register_sip_call_request: RegisterCallRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/register_sip_call", json=data, headers=headers)
+            return response.json()
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:
@@ -76,8 +74,8 @@ async def terminate_session(session_id: str, terminate_session_request: Terminat
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/sessions/{session_id}/terminate", json=terminate_session_request.model_dump(), headers=headers)
+            return response.json()
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:
@@ -99,8 +97,8 @@ async def start_outbound_call(start_outbound_call_request: StartOutboundCallRequ
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/start_outbound_call", json=data, headers=headers)
+            return response.json()
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:

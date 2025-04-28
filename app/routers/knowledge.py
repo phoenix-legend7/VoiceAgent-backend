@@ -1,7 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from io import BytesIO
 import httpx
 
 from app.utils.httpx import get_httpx_headers, httpx_base_url
@@ -32,8 +30,8 @@ async def generate_presigned_url(generate_presigned_url_request: GeneratePresign
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/knowledge/generate_presigned_url", json=generate_presigned_url_request.model_dump(), headers=headers)
+            return response.json()
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:
@@ -45,8 +43,8 @@ async def create_file(create_file_request: CreateFileRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/knowledge/create_file", json=create_file_request.model_dump(), headers=headers)
+            return response.text
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:
@@ -58,8 +56,8 @@ async def delete_file(delete_file_request: DeleteFileRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/knowledge/delete_file", json=delete_file_request.model_dump(), headers=headers)
+            return response.text
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:
@@ -71,8 +69,8 @@ async def set_agent_files(set_agent_files_request: SetAgentFilesRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/knowledge/set_agent_files", json=set_agent_files_request.model_dump(), headers=headers)
+            return response.text
 
-        return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
         raise
     except Exception as e:
