@@ -131,3 +131,33 @@ async def delete_campaign(campaign_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{campaign_id}/info")
+async def get_campain_info(campaign_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = get_httpx_headers()
+            response = await client.get(f"{httpx_base_url}/campaigns/{campaign_id}/info", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.json()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{campaign_id}/records/{phone}")
+async def delete_campaign_record(campaign_id: str, phone: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = get_httpx_headers()
+            response = await client.delete(f"{httpx_base_url}/campaigns/{campaign_id}/records/{phone}", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
