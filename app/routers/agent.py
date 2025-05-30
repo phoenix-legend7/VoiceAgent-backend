@@ -12,7 +12,11 @@ async def get_agent():
         try:
             headers = get_httpx_headers()
             response = await client.get(f"{httpx_base_url}/agents", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -22,7 +26,11 @@ async def create_agent(agent: AgentCreate):
         try:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/agents", data=json.dumps(agent.model_dump()), headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -32,7 +40,11 @@ async def get_agent_by_id(agent_id: str):
         try:
             headers = get_httpx_headers()
             response = await client.get(f"{httpx_base_url}/agents/{agent_id}", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -42,7 +54,11 @@ async def update_agent(agent_id: str, agent: AgentUpdate):
         try:
             headers = get_httpx_headers()
             response = await client.put(f"{httpx_base_url}/agents/{agent_id}", data=json.dumps(agent.model_dump()), headers=headers)
-            return response.json()
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -52,7 +68,11 @@ async def delete_agent(agent_id: str):
         try:
             headers = get_httpx_headers()
             response = await client.delete(f"{httpx_base_url}/agents/{agent_id}", headers=headers)
-            return response.json()
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -62,7 +82,11 @@ async def duplicate_agent(agent_id: str):
         try:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/agents/{agent_id}/duplicate", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -72,7 +96,11 @@ async def get_call_histories(agent_id: str, start_at: float, limit: int):
         try:
             headers = get_httpx_headers()
             response = await client.get(f"{httpx_base_url}/agents/{agent_id}/call-histories", headers=headers, params={ "start_at": start_at, "limit": limit })
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -82,6 +110,10 @@ async def set_embed_config(agent_id: str, embed_config: dict):
         try:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/agents/{agent_id}/embed", json=embed_config, headers=headers)
-            return response.json()
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))

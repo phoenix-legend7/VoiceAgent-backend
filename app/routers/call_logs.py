@@ -11,6 +11,8 @@ async def get_call_log(session_id: str):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.get(f"{httpx_base_url}/call-logs/{session_id}", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
 
     except HTTPException:
@@ -24,7 +26,9 @@ async def delete_call_log(session_id: str):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.delete(f"{httpx_base_url}/call-logs/{session_id}", headers=headers)
-            return response.json()
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
 
     except HTTPException:
         raise

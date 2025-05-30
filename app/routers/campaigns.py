@@ -18,6 +18,8 @@ async def create_campaign(create_campaign_request: CreateCampaignRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/campaigns", json=create_campaign_request.model_dump(), headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
 
     except HTTPException:
@@ -31,6 +33,8 @@ async def get_campaigns():
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.get(f"{httpx_base_url}/campaigns", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
 
     except HTTPException:
@@ -44,6 +48,8 @@ async def upload_campaign_record(campaign_id: str, upload_campaign_record_reques
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/campaigns/{campaign_id}/records", json=upload_campaign_record_request, headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.text
 
     except HTTPException:
@@ -57,7 +63,9 @@ async def set_caller(campaign_id: str, set_caller_request: SetCallerRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/campaigns/{campaign_id}/set_caller", json=set_caller_request.model_dump(), headers=headers)
-            return response.json()
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
 
     except HTTPException:
         raise
@@ -70,7 +78,9 @@ async def start_campaign(campaign_id: str):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/campaigns/{campaign_id}/start", headers=headers)
-            return response.json()
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
 
     except HTTPException:
         raise
@@ -83,7 +93,9 @@ async def stop_campaign(campaign_id: str):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/campaigns/{campaign_id}/stop", headers=headers)
-            return response.json()
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
 
     except HTTPException:
         raise
@@ -96,6 +108,8 @@ async def get_campaign(campaign_id: str):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.get(f"{httpx_base_url}/campaigns/{campaign_id}", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
 
     except HTTPException:
@@ -109,6 +123,8 @@ async def delete_campaign(campaign_id: str):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.delete(f"{httpx_base_url}/campaigns/{campaign_id}", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.text
 
     except HTTPException:
