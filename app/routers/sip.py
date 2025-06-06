@@ -40,7 +40,9 @@ async def create_sip(create_sip_request: CreateSipRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/sip", json=data, headers=headers)
-            return response.json()
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
 
     except HTTPException:
         raise
@@ -53,7 +55,9 @@ async def delete_sip(call_id: str):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.delete(f"{httpx_base_url}/sip/{call_id}", headers=headers)
-            return response.json()
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
 
     except HTTPException:
         raise
@@ -67,6 +71,8 @@ async def create_webrtc_offer(create_webrtc_offer_request: CreateWebrtcOfferRequ
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/webrtc/offer", json=create_webrtc_offer_request.model_dump(), headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
 
     except HTTPException:

@@ -30,6 +30,8 @@ async def chat(chat_request: ChatRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/chat/completions", json=data, headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
 
         return StreamingResponse(BytesIO(response.content), media_type=response.headers['Content-Type'])
     except HTTPException:
