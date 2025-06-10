@@ -26,6 +26,17 @@ class ImportPhoneRequest(BaseModel):
     auth_id: str = None
     auth_token: str = None
 
+class PurchasePhoneRequest(BaseModel):
+    country: str
+    area_code: str
+    street: str = None
+    city: str = None
+    state_region: str = None
+    postal_code: str = None
+
+class SetTaggingRequest(BaseModel):
+    tags: list[str]
+
 @router.post("/set_phone_agent")
 async def set_phone_agent(set_phone_agent_request: SetPhoneAgentRequest):
     try:
@@ -71,6 +82,36 @@ async def get_phone(phone_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.delete("/phone/{phone_id}")
+async def delete_phone(phone_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = get_httpx_headers()
+            response = await client.delete(f"{httpx_base_url}/phone/{phone_id}", headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.json()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/phone/{phone_id}/tags")
+async def set_phone_tag(phone_id: str, request: SetTaggingRequest):
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = get_httpx_headers()
+            response = await client.put(f"{httpx_base_url}/phone/{phone_id}", json=request.model_dump(), headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.json()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/phones/{phone}/agent-config-override")
 async def set_agent_config_override(phone: str, agent_config_override: dict):
     try:
@@ -107,6 +148,21 @@ async def import_phone_number(request: ImportPhoneRequest):
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/phones/import", json=request.model_dump(), headers=headers)
+            if response.status_code != 200 and response.status_code != 201:
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
+            return response.text
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/phones/purchase")
+async def purchase_phone_number(request: PurchasePhoneRequest):
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = get_httpx_headers()
+            response = await client.post(f"{httpx_base_url}/phones/purchase", json=request.model_dump(), headers=headers)
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.text

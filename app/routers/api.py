@@ -1,15 +1,18 @@
 from fastapi import APIRouter
 from app.core.config import settings
-from app.routers import health
-from app.routers import agent
-from app.routers import chat
-from app.routers import voice
-from app.routers import call
-from app.routers import sip
-from app.routers import phone
-from app.routers import call_logs
-from app.routers import knowledge
-from app.routers import campaigns
+from app.routers import (
+    health,
+    agent,
+    chat,
+    voice,
+    call,
+    sip,
+    phone,
+    call_logs,
+    knowledge,
+    campaigns,
+    user,
+)
 
 api_router = APIRouter(prefix=settings.API_V1_STR)
 
@@ -23,3 +26,4 @@ api_router.include_router(phone.router, tags=["phone"])
 api_router.include_router(call_logs.router, prefix="/call-logs", tags=["call_logs"])
 api_router.include_router(knowledge.router, prefix="/knowledge", tags=["knowledge"])
 api_router.include_router(campaigns.router, prefix="/campaigns", tags=["campaigns"])
+api_router.include_router(user.router, prefix="/user", tags=["user"])
