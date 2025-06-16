@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import asyncio
 import httpx
 
-from app.core.database import get_db
+from app.core.database import get_db, get_db_background
 from app.models.call_log import CallLog
 from app.utils.log import log_call_log
 from app.utils.httpx import get_httpx_headers, httpx_base_url
@@ -14,73 +14,76 @@ router = APIRouter()
 
 async def get_end_time():
     try:
-        async for db in get_db():
-            async with db as session:
-                response = await session.execute(
-                    select(CallLog.ts)
-                    .order_by(CallLog.ts.desc())
-                    .limit(1)
-                )
-                result = response.scalars().first()
-                return result or 0
+        async with get_db_background() as session:
+            response = await session.execute(
+                select(CallLog.ts)
+                .order_by(CallLog.ts.desc())
+                .limit(1)
+            )
+            result = response.scalars().first()
+            return result or 0
     except Exception as e:
         log_call_log(f"Real Time: Failed to get end time\n{str(e)}")
         return 0
 
 async def get_next_cursor():
     try:
-        async for db in get_db():
-            async with db as session:
-                response = await session.execute(
-                    select(CallLog.ts)
-                    .order_by(CallLog.ts.asc())
-                    .limit(1)
-                )
-                result = response.scalars().first()
-                return result or 0
+        async with get_db_background() as session:
+            response = await session.execute(
+                select(CallLog.ts)
+                .order_by(CallLog.ts.asc())
+                .limit(1)
+            )
+            result = response.scalars().first()
+            return result or 0
     except Exception as e:
         log_call_log(f"Real Time: Failed to get next cursor\n{str(e)}")
         return 0
 
 async def save_histories(histories: list):
+    if not histories:
+        return True
+        
     try:
-        async for db in get_db():
-            async with db as session:
-                for history in histories:
-                    call_log = CallLog(
-                        agent_id = history.get("agent_id") or None,
-                        agent_config = history.get("agent_config") or None,
-                        duration = history.get("duration") or None,
-                        ts = history.get("ts") or None,
-                        chat = history.get("chat") or None,
-                        chars_used = history.get("chars_used") or None,
-                        session_id = history.get("session_id") or None,
-                        call_id = history.get("call_id") or None,
-                        cost_breakdown = history.get("cost_breakdown") or None,
-                        voip = history.get("voip") or None,
-                        recording = history.get("recording") or None,
-                        call_metadata = history.get("metadata") or None,
-                        function_calls = history.get("function_calls") or None,
-                        call_status = history.get("call_status") or None,
-                    )
-                    session.add(call_log)
-                try:
-                    await session.commit()
-                except Exception as e:
-                    log_call_log(f"Real Time: Failed to save history\n{str(e)}")
-                    await session.rollback()
-                return True
+        async with get_db_background() as session:
+            for history in histories:
+                call_log = CallLog(
+                    agent_id = history.get("agent_id") or None,
+                    agent_config = history.get("agent_config") or None,
+                    duration = history.get("duration") or None,
+                    ts = history.get("ts") or None,
+                    chat = history.get("chat") or None,
+                    chars_used = history.get("chars_used") or None,
+                    session_id = history.get("session_id") or None,
+                    call_id = history.get("call_id") or None,
+                    cost_breakdown = history.get("cost_breakdown") or None,
+                    voip = history.get("voip") or None,
+                    recording = history.get("recording") or None,
+                    call_metadata = history.get("metadata") or None,
+                    function_calls = history.get("function_calls") or None,
+                    call_status = history.get("call_status") or None,
+                )
+                session.add(call_log)
+            try:
+                await session.commit()
+            except Exception as e:
+                log_call_log(f"Real Time: Failed to save history\n{str(e)}")
+                await session.rollback()
+                return False
+            return True
     except Exception as e:
         log_call_log(f"Real Time: Failed to save call logs\n{str(e)}")
         return False
 
 async def get_all_logs():
-    await asyncio.sleep(10)
+    await asyncio.sleep(10)  # Initial delay
     max_ts = await get_next_cursor()
+    
     while True:
         try:
             print('-------------------------')
             print(f"Next cursor is {max_ts}")
+            
             async with httpx.AsyncClient() as client:
                 headers = get_httpx_headers()
                 params = {
@@ -90,15 +93,24 @@ async def get_all_logs():
                 response = await client.get(f"{httpx_base_url}/call-logs", headers=headers, params=params)
                 if response.status_code != 200 and response.status_code != 201:
                     raise Exception(response.text or "Unknown Error")
+                    
                 data = response.json()
                 histories = data.get("histories", [])
                 print(f"{len(histories)} histories found")
-                await save_histories(histories)
+                
+                if histories:
+                    success = await save_histories(histories)
+                    if not success:
+                        await asyncio.sleep(5)  # Wait before retrying on failure
+                        continue
+                
                 print('-------------------------')
                 max_ts = data.get("next_cursor", 0)
                 if not max_ts:
                     print("No more data")
                     break
+                    
+                await asyncio.sleep(1)  # Small delay between batches
 
         except Exception as e:
             log_call_log(f"Real Time: Failed to get all call logs\n{str(e)}")
@@ -110,9 +122,11 @@ async def get_next_logs():
         if not last_time:
             print("No data updated")
             return
+            
         start_time = last_time + 1
         print('-------------------------')
         print(f"Start time is {start_time}")
+        
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             params = {
@@ -122,11 +136,13 @@ async def get_next_logs():
             response = await client.get(f"{httpx_base_url}/call-logs", headers=headers, params=params)
             if response.status_code != 200 and response.status_code != 201:
                 raise Exception(response.text or "Unknown Error")
+                
             data = response.json()
             histories = data.get("histories", [])
             if not histories:
                 print("No data updated")
                 return
+                
             print(f"{len(histories)} new histories found")
             await save_histories(histories)
 
