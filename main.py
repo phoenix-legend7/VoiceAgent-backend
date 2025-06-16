@@ -71,7 +71,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
-app.get("/all_log", tags=["Fetch log"])(get_msg_log)
+# app.get("/all_log", tags=["Fetch log"])(get_msg_log)
 
 @app.get("/")
 async def root():

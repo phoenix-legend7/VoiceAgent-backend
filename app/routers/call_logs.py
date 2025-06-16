@@ -7,7 +7,7 @@ import httpx
 
 from app.core.database import get_db, get_db_background
 from app.models.call_log import CallLog
-from app.utils.log import log_call_log
+# from app.utils.log import log_call_log
 from app.utils.httpx import get_httpx_headers, httpx_base_url
 
 router = APIRouter()
@@ -23,7 +23,7 @@ async def get_end_time():
             result = response.scalars().first()
             return result or 0
     except Exception as e:
-        log_call_log(f"Real Time: Failed to get end time\n{str(e)}")
+        print(f"Real Time: Failed to get end time\n{str(e)}")
         return 0
 
 async def get_next_cursor():
@@ -37,7 +37,7 @@ async def get_next_cursor():
             result = response.scalars().first()
             return result or 0
     except Exception as e:
-        log_call_log(f"Real Time: Failed to get next cursor\n{str(e)}")
+        print(f"Real Time: Failed to get next cursor\n{str(e)}")
         return 0
 
 async def save_histories(histories: list):
@@ -67,12 +67,12 @@ async def save_histories(histories: list):
             try:
                 await session.commit()
             except Exception as e:
-                log_call_log(f"Real Time: Failed to save history\n{str(e)}")
+                print(f"Real Time: Failed to save history\n{str(e)}")
                 await session.rollback()
                 return False
             return True
     except Exception as e:
-        log_call_log(f"Real Time: Failed to save call logs\n{str(e)}")
+        print(f"Real Time: Failed to save call logs\n{str(e)}")
         return False
 
 async def get_all_logs():
@@ -113,7 +113,7 @@ async def get_all_logs():
                 await asyncio.sleep(1)  # Small delay between batches
 
         except Exception as e:
-            log_call_log(f"Real Time: Failed to get all call logs\n{str(e)}")
+            print(f"Real Time: Failed to get all call logs\n{str(e)}")
             await asyncio.sleep(10)
 
 async def get_next_logs():
@@ -147,7 +147,7 @@ async def get_next_logs():
             await save_histories(histories)
 
     except Exception as e:
-        log_call_log(f"Real Time: Failed to get next call logs\n{str(e)}")
+        print(f"Real Time: Failed to get next call logs\n{str(e)}")
 
 @router.get("/")
 async def get_logs(
@@ -217,5 +217,3 @@ async def delete_call_log(session_id: str, db: AsyncSession = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
