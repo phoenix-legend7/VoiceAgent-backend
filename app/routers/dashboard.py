@@ -53,6 +53,9 @@ def calc_total_cost(rows):
         )
     )
 
+def calc_success_logs(rows):
+    return len([row for row in rows if is_success(row)])
+
 @router.get("/")
 async def get_dashboard_data(
     agent_id: str = None,
@@ -96,8 +99,8 @@ async def get_dashboard_data(
 
         # Calc main values
         total_calls = len(rows)
-        success_count = len([row for row in rows if is_success(row)])
-        success_rate = success_count / total_calls * 100
+        success_count = calc_success_logs(rows)
+        success_rate = success_count / (total_calls or 1) * 100
         total_minutes = calc_total_minutes(rows)
         total_cost = calc_total_cost(rows)
 
@@ -117,13 +120,14 @@ async def get_dashboard_data(
             if agent:
                 agent_total_minutes = calc_total_minutes(agent_rows)
                 agent_total_cost = calc_total_cost(agent_rows)
-                cost_per_minute = agent_total_cost / (agent_total_minutes if agent_total_minutes > 0 else 1)
+                cost_per_minute = agent_total_cost / (agent_total_minutes or 1)
                 performances.append({
                     "agent_name": agent.get("name", "(Unnamed)"),
                     "total_call": len(agent_rows),
                     "total_minutes": round(agent_total_minutes, 2),
                     "total_cost": round(agent_total_cost, 2),
                     "cost_per_minute": round(cost_per_minute, 3),
+                    "success_call": calc_success_logs(agent_rows),
                 })
 
         return {
