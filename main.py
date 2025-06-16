@@ -7,7 +7,7 @@ import nest_asyncio
 
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.utils.log import check_folder_exist
+from app.utils.log import check_folder_exist, get_msg_log
 from app.routers.api import api_router
 from app.routers.call_logs import get_all_logs, get_next_logs
 
@@ -64,6 +64,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+app.get("/all_log", tags=["Fetch log"])(get_msg_log)
 
 @app.get("/")
 async def root():
