@@ -1,41 +1,55 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy import select, func, text, case, Float, cast, literal_column, Numeric, lateral
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone, timedelta
+import itertools
 
 from app.core.database import get_db
 from app.models.call_log import CallLog
+from app.routers.agent import get_agents
 
 router = APIRouter()
 
-# Helper function to extract cost from cost_breakdown array
-def get_cost_expression():
-    cost_subq = select(
-        CallLog.id,
-        cast(
-            func.jsonb_array_elements(cast(CallLog.cost_breakdown, JSONB)).op('->>')('credit'),
-            Float
-        ).label('credit')
-    ).where(
-        func.jsonb_typeof(cast(CallLog.cost_breakdown, JSONB)) == 'array'
-    ).subquery()
-    
-    return func.coalesce(func.sum(cost_subq.c.credit), 0.0)
-
-# Helper to determine successful calls
-def get_success_expression():
-    # success_statuses = ['user-ended', 'agent-ended', 'api-ended', 'voicemail-message']
-    # success_statuses = ['registered', 'queued', 'dispatching', 'provider_queued', 'initiated',
-    #                     'ringing', 'in-progress', 'user-ended', 'agent-ended', 'api-ended',
-    #                     'voicemail-hangup', 'voicemail-message', 'chat_completion']
+def is_success(row: CallLog):
     error_statuses = ['timeout', 'busy', 'no-answer', 'failed', 'canceled', 'error', 'unknown']
-    return func.coalesce(
-        func.sum(
-            case(
-                (CallLog.call_status.in_(error_statuses), 0),
-                else_=1
-            )
+    return not row.call_status in error_statuses
+
+def is_qualified(row: CallLog):
+    statuses = ["in-progress", "user-ended", "agent-ended", "api-ended", "chat_completion"]
+    return row.call_status in statuses
+
+def is_answering(row: CallLog):
+    statuses = ["voicemail-hangup", "voicemail-message"]
+    return row.call_status in statuses
+
+def is_no_answer(row: CallLog):
+    statuses = ["no-answer", "timeout", "canceled"]
+    return row.call_status in statuses
+
+def is_busy(row: CallLog):
+    return row.call_status == "busy"
+
+def group_by_agent(rows):
+    grouped = {}
+    get_key = lambda x: x.agent_id  # Pre-compute key accessor
+    for row in rows:
+        k = get_key(row)
+        lst = grouped.get(k)
+        if lst is None:
+            lst = []
+            grouped[k] = lst
+        lst.append(row)
+    return grouped
+
+def calc_total_minutes(rows):
+    return sum([row.duration or 0 for row in rows]) / 60
+
+def calc_total_cost(rows):
+    return sum(
+        item.get("credit", 0) 
+        for item in itertools.chain.from_iterable(
+            d.cost_breakdown if d.cost_breakdown is not None else [] 
+            for d in rows
         )
     )
 
@@ -46,13 +60,8 @@ async def get_dashboard_data(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        query = select(
-            func.count().label("total_calls"),
-            func.coalesce(func.sum(CallLog.duration) / 60, 0).label("total_minutes"),
-            get_cost_expression().label("total_cost"),
-            get_success_expression().label("success_count"),
-            func.avg(CallLog.duration).label("avg_duration")
-        )
+        agents: list = await get_agents()
+        query = select(CallLog)
         if agent_id:
             query = query.where(CallLog.agent_id == agent_id)
         if time_period:
@@ -79,18 +88,52 @@ async def get_dashboard_data(
                     end_time = datetime(now.year, quarter_start_month + 3, 1, tzinfo=timezone.utc)
             else:
                 raise HTTPException(status_code=400, detail="Invalid time period. Must be one of: today, week, month, quarter")
-            
+
             query = query.where(CallLog.ts >= start_time.timestamp())
             query = query.where(CallLog.ts < end_time.timestamp())
         result = await db.execute(query)
-        row = result.first()
-        success_rate = (row.success_count / row.total_calls * 100) if row.total_calls > 0 else 0
-        return {
-            "total_calls": row.total_calls,
-            "total_minutes": round(row.total_minutes, 2) if row.total_minutes else 0,
-            "total_cost": round(row.total_cost, 2) if row.total_cost else 0,
-            "success_rate": round(success_rate, 2),
-            "avg_call_duration": round(row.avg_duration, 2) if row.avg_duration else 0
+        rows = result.scalars().all()
+
+        # Calc main values
+        total_calls = len(rows)
+        success_count = len([row for row in rows if is_success(row)])
+        success_rate = success_count / total_calls * 100
+        total_minutes = calc_total_minutes(rows)
+        total_cost = calc_total_cost(rows)
+
+        # Calc dispositions
+        dispositions = {
+            "qualified": len([row for row in rows if is_qualified(row)]),
+            "answering": len([row for row in rows if is_answering(row)]),
+            "no_answer": len([row for row in rows if is_no_answer(row)]),
+            "busy": len([row for row in rows if is_busy(row)]),
         }
+
+        # Calc performances by agent
+        performances = []
+        grouped = group_by_agent(rows)
+        for key, agent_rows in grouped.items():
+            agent = next((agent for agent in agents if agent.get("id") == key), None)
+            if agent:
+                agent_total_minutes = calc_total_minutes(agent_rows)
+                agent_total_cost = calc_total_cost(agent_rows)
+                cost_per_minute = agent_total_cost / (agent_total_minutes if agent_total_minutes > 0 else 1)
+                performances.append({
+                    "agent_name": agent.get("name", "(Unnamed)"),
+                    "total_minutes": round(agent_total_minutes, 2),
+                    "total_cost": round(agent_total_cost, 2),
+                    "cost_per_minute": round(cost_per_minute, 3),
+                })
+
+        return {
+            "total_calls": total_calls,
+            "total_minutes": round(total_minutes, 2),
+            "total_cost": round(total_cost, 2),
+            "success_rate": round(success_rate, 2),
+            "dispositions": dispositions,
+            "performances": performances,
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

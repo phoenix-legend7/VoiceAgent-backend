@@ -7,7 +7,7 @@ from app.utils.httpx import get_httpx_headers, httpx_base_url
 router = APIRouter()
 
 @router.get("/")
-async def get_agent():
+async def get_agents():
     async with httpx.AsyncClient() as client:
         try:
             headers = get_httpx_headers()
