@@ -4,6 +4,7 @@ from app.routers import (
     health,
     agent,
     chat,
+    dashboard,
     voice,
     call,
     sip,
@@ -17,6 +18,7 @@ from app.routers import (
 api_router = APIRouter(prefix=settings.API_V1_STR)
 
 api_router.include_router(health.router, tags=["health"])
+api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(agent.router, prefix="/agent", tags=["agent"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(voice.router, prefix="/voice", tags=["voice"])
