@@ -120,6 +120,7 @@ async def get_dashboard_data(
                 cost_per_minute = agent_total_cost / (agent_total_minutes if agent_total_minutes > 0 else 1)
                 performances.append({
                     "agent_name": agent.get("name", "(Unnamed)"),
+                    "total_call": len(agent_rows),
                     "total_minutes": round(agent_total_minutes, 2),
                     "total_cost": round(agent_total_cost, 2),
                     "cost_per_minute": round(cost_per_minute, 3),
