@@ -14,3 +14,10 @@ def log_msg_file(filepath: str, content: str):
 
 def log_call_log(content: str):
     log_msg_file(LOG_FILE, content)
+
+def get_msg_log():
+    try:
+        with open(LOG_FILE, "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError:
+        return ""
