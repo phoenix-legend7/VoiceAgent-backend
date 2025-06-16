@@ -3,12 +3,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
+import nest_asyncio
 
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.utils.log import check_folder_exist
 from app.routers.api import api_router
 from app.routers.call_logs import get_all_logs, get_next_logs
+
+# Apply nest_asyncio to allow nested event loops
+nest_asyncio.apply()
 
 async def init_models():
     async with engine.begin() as conn:
@@ -25,11 +29,23 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     
     check_folder_exist()
-    asyncio.create_task(init_models())
-    asyncio.create_task(get_all_logs())
+    
+    # Create tasks in the current event loop
+    init_task = asyncio.create_task(init_models())
+    logs_task = asyncio.create_task(get_all_logs())
+    
+    # Wait for initialization to complete
+    await init_task
+    
     yield
+    
     # Cleanup
     scheduler.shutdown()
+    logs_task.cancel()
+    try:
+        await logs_task
+    except asyncio.CancelledError:
+        pass
 
 app = FastAPI(
     title=settings.APP_NAME,
