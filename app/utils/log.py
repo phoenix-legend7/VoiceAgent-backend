@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 
 LOG_DIR = "./log"
 LOG_FILE = f"{LOG_DIR}/call_log.log"
@@ -8,8 +9,9 @@ def check_folder_exist():
         os.mkdir(LOG_DIR)
 
 def log_msg_file(filepath: str, content: str):
+    time = datetime.today().isoformat()
     file = open(filepath, "+a", encoding="utf-8")
-    file.write(f"{content}\n")
+    file.write(f"{time}\n{content}\n\n")
     file.close()
 
 def log_call_log(content: str):
