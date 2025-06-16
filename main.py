@@ -17,11 +17,11 @@ async def init_models():
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     scheduler = AsyncIOScheduler()
-    # scheduler.add_job(get_next_logs, trigger='interval', seconds=10)
+    scheduler.add_job(get_next_logs, trigger='interval', seconds=10)
     scheduler.start()
     check_folder_exist()
     asyncio.create_task(init_models())
-    # asyncio.create_task(get_all_logs())
+    asyncio.create_task(get_all_logs())
     yield
 
 app = FastAPI(
