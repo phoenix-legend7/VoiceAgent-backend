@@ -15,14 +15,21 @@ async def init_models():
         await conn.run_sync(Base.metadata.create_all)
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
-    scheduler = AsyncIOScheduler()
+async def lifespan(app: FastAPI):
+    # Get the current event loop
+    loop = asyncio.get_running_loop()
+    
+    # Create scheduler with the current event loop
+    scheduler = AsyncIOScheduler(event_loop=loop)
     scheduler.add_job(get_next_logs, trigger='interval', seconds=10)
     scheduler.start()
+    
     check_folder_exist()
     asyncio.create_task(init_models())
     asyncio.create_task(get_all_logs())
     yield
+    # Cleanup
+    scheduler.shutdown()
 
 app = FastAPI(
     title=settings.APP_NAME,
