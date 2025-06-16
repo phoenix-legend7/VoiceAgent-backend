@@ -16,12 +16,22 @@ engine = create_async_engine(
     pool_recycle=1800,  # Recycle connections after 30 minutes
 )
 
+# Regular session factory for request handlers
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False  # Prevent expired object issues
+)
+
+# Background session factory with different settings
+BackgroundSessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False
 )
 
 Base = declarative_base()
@@ -36,8 +46,8 @@ async def get_db():
 @asynccontextmanager
 async def get_db_background():
     """Context manager for background tasks that need database access"""
-    async with SessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+    session = BackgroundSessionLocal()
+    try:
+        yield session
+    finally:
+        await session.close()

@@ -25,22 +25,29 @@ async def lifespan(app: FastAPI):
     
     # Create scheduler with the current event loop
     scheduler = AsyncIOScheduler(event_loop=loop)
-    scheduler.add_job(get_next_logs, trigger='interval', seconds=10)
+    
+    # Add jobs to scheduler
+    scheduler.add_job(get_next_logs, trigger='interval', seconds=10, id='get_next_logs')
+    
+    # Start scheduler
     scheduler.start()
     
+    # Ensure folder exists
     check_folder_exist()
     
-    # Create tasks in the current event loop
-    init_task = asyncio.create_task(init_models())
-    logs_task = asyncio.create_task(get_all_logs())
+    # Initialize database
+    await init_models()
     
-    # Wait for initialization to complete
-    await init_task
+    # Start background task in the same event loop
+    logs_task = asyncio.create_task(get_all_logs())
     
     yield
     
     # Cleanup
+    scheduler.remove_job('get_next_logs')
     scheduler.shutdown()
+    
+    # Cancel and wait for background task
     logs_task.cancel()
     try:
         await logs_task
@@ -64,7 +71,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
-app.get("/all_log", tags=["Fetch log"])(get_msg_log)
+# app.get("/all_log", tags=["Fetch log"])(get_msg_log)
 
 @app.get("/")
 async def root():
