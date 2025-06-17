@@ -7,9 +7,10 @@ import nest_asyncio
 
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.utils.log import check_folder_exist, get_msg_log
+from app.utils.log import check_folder_exist
 from app.routers.api import api_router
 from app.routers.call_logs import get_all_logs, get_next_logs
+from app.services.campaign_scheduler import campaign_scheduler
 
 # Apply nest_asyncio to allow nested event loops
 nest_asyncio.apply()
@@ -32,11 +33,14 @@ async def lifespan(app: FastAPI):
     # Start scheduler
     scheduler.start()
     
-    # Ensure folder exists
-    check_folder_exist()
-    
     # Initialize database
     await init_models()
+    
+    # Start campaign scheduler
+    await campaign_scheduler.start()
+    
+    # Ensure folder exists
+    check_folder_exist()
     
     # Start background task in the same event loop
     logs_task = asyncio.create_task(get_all_logs())
@@ -46,6 +50,7 @@ async def lifespan(app: FastAPI):
     # Cleanup
     scheduler.remove_job('get_next_logs')
     scheduler.shutdown()
+    campaign_scheduler.shutdown()
     
     # Cancel and wait for background task
     logs_task.cancel()
