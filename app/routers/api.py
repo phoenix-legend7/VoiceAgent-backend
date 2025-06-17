@@ -12,6 +12,7 @@ from app.routers import (
     call_logs,
     knowledge,
     campaigns,
+    campaign_schedule,
     user,
 )
 
@@ -28,4 +29,5 @@ api_router.include_router(phone.router, tags=["phone"])
 api_router.include_router(call_logs.router, prefix="/call-logs", tags=["call_logs"])
 api_router.include_router(knowledge.router, prefix="/knowledge", tags=["knowledge"])
 api_router.include_router(campaigns.router, prefix="/campaigns", tags=["campaigns"])
+api_router.include_router(campaign_schedule.router, prefix="/campaign-schedule", tags=["campaign_schedule"])
 api_router.include_router(user.router, prefix="/user", tags=["user"])
