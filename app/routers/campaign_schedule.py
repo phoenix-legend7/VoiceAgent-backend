@@ -8,7 +8,7 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.models.campaign_schedule import CampaignSchedule, FrequencyType
-from app.routers.campaigns import create_campaign, get_campaigns, set_caller, CreateCampaignRequest, SetCallerRequest
+from app.routers.campaigns import create_campaign, get_campaigns, get_campaign, set_caller, CreateCampaignRequest, SetCallerRequest
 from app.services.campaign_scheduler import campaign_scheduler
 
 class FrequencyEnum(str, Enum):
@@ -26,6 +26,16 @@ class CreateCampaignScheduleRequest(BaseModel):
     start_time: int = None
     end_time: int = None
 
+class CreateOnlyScheduleRequest(BaseModel):
+    campaign_id: str
+    campaign_name: str
+    campaign_status: str
+    caller: str
+    frequency: FrequencyEnum
+    start_time: int = None
+    end_time: int = None
+    created_at: int
+
 class UpdateCampaignScheduleRequest(BaseModel):
     caller: Optional[str] = None
     start_time: Optional[int] = None
@@ -41,9 +51,10 @@ async def get_scheduled_campaigns(db: AsyncSession = Depends(get_db)):
         result = await db.execute(select(CampaignSchedule))
         db_campaigns = result.scalars().all()
         scheduled_campaigns = []
-        for db_campaign in db_campaigns:
-            campaign_millis = next((camp for camp in campaigns_millis if camp.get("id") == db_campaign.id), None)
-            if campaign_millis:
+        not_scheduled_campaigns = []
+        for campaign_millis in campaigns_millis:
+            db_campaign = next((camp for camp in db_campaigns if campaign_millis.get("id") == camp.id), None)
+            if db_campaign:
                 scheduled_campaigns.append({
                     "id": db_campaign.campaign_id,
                     "created_at": db_campaign.created_at,
@@ -56,7 +67,12 @@ async def get_scheduled_campaigns(db: AsyncSession = Depends(get_db)):
                     "campaign_status": campaign_millis.get("status", None),
                     "caller": campaign_millis.get("caller", None),
                 })
-        return scheduled_campaigns
+            else:
+                not_scheduled_campaigns.append(campaign_millis)
+        return {
+            "scheduled_campaigns": scheduled_campaigns,
+            "not_scheduled_campaigns": not_scheduled_campaigns,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -84,8 +100,6 @@ async def create_campaign_schedule(
             )
         )
 
-        # # Convert timestamps to datetime objects if they exist
-
         # Save campaign data to database
         campaign_schedule = CampaignSchedule(
             campaign_id = campaign.get("id"),
@@ -96,6 +110,59 @@ async def create_campaign_schedule(
             end_time = request.end_time,
             frequency = FrequencyType(request.frequency.value),
             created_at = campaign.get("created_at"),
+        )
+
+        try:
+            db.add(campaign_schedule)
+            await db.commit()
+            await db.refresh(campaign_schedule)
+
+        except Exception as e:
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to save to database: {str(e)}")
+
+        # Schedule the campaign
+        await campaign_scheduler.schedule_campaign(campaign_schedule)
+
+        return campaign_schedule
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/exist")
+async def create_only_campaign_schedule(
+    request: CreateOnlyScheduleRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        campaign_id = request.campaign_id
+        result = await db.execute(
+            select(CampaignSchedule)
+            .where(CampaignSchedule.campaign_id == campaign_id)
+        )
+        db_campaign = result.scalar_one_or_none()
+        if db_campaign:
+            raise HTTPException(400, detail=f"Campaign {campaign_id} has already scheduled")
+
+        # Set caller to campaign
+        await set_caller(
+            campaign_id,
+            SetCallerRequest(
+                caller=request.caller
+            )
+        )
+
+        # Save campaign data to database
+        campaign_schedule = CampaignSchedule(
+            campaign_id = campaign_id,
+            campaign_name = request.campaign_name,
+            campaign_status = request.campaign_status,
+            caller = request.caller,
+            start_time = request.start_time,
+            end_time = request.end_time,
+            frequency = FrequencyType(request.frequency.value),
+            created_at = request.created_at,
         )
 
         try:
