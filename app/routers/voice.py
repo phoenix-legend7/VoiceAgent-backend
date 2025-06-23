@@ -14,6 +14,8 @@ async def voice(lang_code: str = "en"):
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -26,5 +28,7 @@ async def get_voices(lang_code: str = "en"):
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
