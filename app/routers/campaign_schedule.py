@@ -7,7 +7,7 @@ from typing import Optional
 from datetime import datetime
 
 from app.core.database import get_db
-from app.models.campaign_schedule import CampaignSchedule, FrequencyType
+from app.models import CampaignSchedule, FrequencyType
 from app.routers.campaigns import create_campaign, get_campaigns, get_campaign, set_caller, CreateCampaignRequest, SetCallerRequest
 from app.services.campaign_scheduler import campaign_scheduler
 

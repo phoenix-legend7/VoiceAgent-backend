@@ -5,7 +5,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 
 from app.core.database import get_db_background
-from app.models.campaign_schedule import CampaignSchedule, FrequencyType
+from app.models import CampaignSchedule, FrequencyType
 from app.routers.campaigns import start_campaign, stop_campaign
 
 class CampaignScheduler:

@@ -6,7 +6,7 @@ import asyncio
 import httpx
 
 from app.core.database import get_db, get_db_background
-from app.models.call_log import CallLog
+from app.models import CallLog
 # from app.utils.log import log_call_log
 from app.utils.httpx import get_httpx_headers, httpx_base_url
 

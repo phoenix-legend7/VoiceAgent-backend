@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 import itertools
 
 from app.core.database import get_db
-from app.models.call_log import CallLog
+from app.models import CallLog
 from app.routers.agent import get_agents
 
 router = APIRouter()
