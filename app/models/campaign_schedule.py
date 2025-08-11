@@ -1,4 +1,5 @@
 from sqlalchemy import Column, DateTime, Text, BigInteger, Integer, Enum
+from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 import enum
 
@@ -24,3 +25,4 @@ class CampaignSchedule(Base):
     status = Column(Text, nullable=False, default="scheduled") # active, paused, scheduled, error
     error = Column(Text, nullable=True)
     created_at = Column(BigInteger, nullable=True)
+    user_id = Column(UUID(as_uuid=True), nullable=True)

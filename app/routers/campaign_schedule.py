@@ -8,7 +8,8 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.models import CampaignSchedule, FrequencyType
-from app.routers.campaigns import create_campaign, get_campaigns, get_campaign, set_caller, CreateCampaignRequest, SetCallerRequest
+from app.routers.auth import current_active_user
+from app.routers.campaigns import create_campaign, get_campaigns_db, set_caller, CreateCampaignRequest, SetCallerRequest
 from app.services.campaign_scheduler import campaign_scheduler
 
 class FrequencyEnum(str, Enum):
@@ -45,10 +46,10 @@ class UpdateCampaignScheduleRequest(BaseModel):
 router = APIRouter()
 
 @router.get("/")
-async def get_scheduled_campaigns(db: AsyncSession = Depends(get_db)):
+async def get_scheduled_campaigns(db: AsyncSession = Depends(get_db), user = Depends(current_active_user)):
     try:
-        campaigns_millis = await get_campaigns()
-        result = await db.execute(select(CampaignSchedule))
+        campaigns_millis = await get_campaigns_db(db, user)
+        result = await db.execute(select(CampaignSchedule).where(CampaignSchedule.user_id == user.id))
         db_campaigns = result.scalars().all()
         scheduled_campaigns = []
         not_scheduled_campaigns = []
@@ -81,13 +82,16 @@ async def get_scheduled_campaigns(db: AsyncSession = Depends(get_db)):
 @router.post("/")
 async def create_campaign_schedule(
     request: CreateCampaignScheduleRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user = Depends(current_active_user)
 ):
     try:
         # Create campaign in MillisAI
-        campaign = await create_campaign(CreateCampaignRequest(
-            name=request.campaign_name
-        ))
+        campaign = await create_campaign(
+            CreateCampaignRequest(name=request.campaign_name),
+            db,
+            user
+        )
         campaign_id = campaign.get("id")
         if not campaign_id:
             raise HTTPException(status_code=400, detail="Failed to create campaign.")
@@ -95,9 +99,9 @@ async def create_campaign_schedule(
         # Set caller to campaign
         await set_caller(
             campaign_id,
-            SetCallerRequest(
-                caller=request.caller
-            )
+            SetCallerRequest(caller=request.caller),
+            db,
+            user
         )
 
         # Save campaign data to database
@@ -110,6 +114,7 @@ async def create_campaign_schedule(
             end_time = request.end_time,
             frequency = FrequencyType(request.frequency.value),
             created_at = campaign.get("created_at"),
+            user_id = user.id,
         )
 
         try:
@@ -133,13 +138,17 @@ async def create_campaign_schedule(
 @router.post("/exist")
 async def create_only_campaign_schedule(
     request: CreateOnlyScheduleRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user = Depends(current_active_user)
 ):
     try:
         campaign_id = request.campaign_id
         result = await db.execute(
             select(CampaignSchedule)
-            .where(CampaignSchedule.campaign_id == campaign_id)
+            .where(
+                CampaignSchedule.campaign_id == campaign_id,
+                CampaignSchedule.user_id == user.id
+            )
         )
         db_campaign = result.scalar_one_or_none()
         if db_campaign:
@@ -148,9 +157,9 @@ async def create_only_campaign_schedule(
         # Set caller to campaign
         await set_caller(
             campaign_id,
-            SetCallerRequest(
-                caller=request.caller
-            )
+            SetCallerRequest(caller=request.caller),
+            db,
+            user
         )
 
         # Save campaign data to database
@@ -163,6 +172,7 @@ async def create_only_campaign_schedule(
             end_time = request.end_time,
             frequency = FrequencyType(request.frequency.value),
             created_at = request.created_at,
+            user_id = user.id,
         )
 
         try:
@@ -187,7 +197,8 @@ async def create_only_campaign_schedule(
 async def pause_campaign_schedule(
     campaign_id: str,
     status: str = "paused",
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user = Depends(current_active_user)
 ):
     try:
         if not status in ["paused", "scheduled"]:
@@ -195,7 +206,10 @@ async def pause_campaign_schedule(
 
         result = await db.execute(
             select(CampaignSchedule)
-            .where(CampaignSchedule.campaign_id == campaign_id)
+            .where(
+                CampaignSchedule.campaign_id == campaign_id,
+                CampaignSchedule.user_id == user.id
+            )
         )
         campaign_schedule = result.scalar_one_or_none()
         if not campaign_schedule:
@@ -233,12 +247,16 @@ async def pause_campaign_schedule(
 @router.post("/{campaign_id}/resume")
 async def resume_campaign_schedule(
     campaign_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user = Depends(current_active_user)
 ):
     try:
         result = await db.execute(
             select(CampaignSchedule)
-            .where(CampaignSchedule.campaign_id == campaign_id)
+            .where(
+                CampaignSchedule.campaign_id == campaign_id,
+                CampaignSchedule.user_id == user.id
+            )
         )
         campaign_schedule = result.scalar_one_or_none()
         if not campaign_schedule:
@@ -269,12 +287,16 @@ async def resume_campaign_schedule(
 async def update_campaign_schedule(
     campaign_id: str,
     request: UpdateCampaignScheduleRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user = Depends(current_active_user)
 ):
     try:
         result = await db.execute(
             select(CampaignSchedule)
-            .where(CampaignSchedule.campaign_id == campaign_id)
+            .where(
+                CampaignSchedule.campaign_id == campaign_id,
+                CampaignSchedule.user_id == user.id
+            )
         )
         campaign_schedule = result.scalar_one_or_none()
         if not campaign_schedule:
@@ -286,9 +308,9 @@ async def update_campaign_schedule(
         if request.caller != None:
             await set_caller(
                 campaign_schedule.id,
-                SetCallerRequest(
-                    caller=request.caller
-                )
+                SetCallerRequest(caller=request.caller),
+                db,
+                user
             )
         if request.frequency != None:
             campaign_schedule.frequency = FrequencyType(request.frequency.value)
@@ -316,12 +338,16 @@ async def update_campaign_schedule(
 @router.delete("/{campaign_id}")
 async def delete_campaign_schedule(
     campaign_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user = Depends(current_active_user)
 ):
     try:
         result = await db.execute(
             select(CampaignSchedule)
-            .where(CampaignSchedule.campaign_id == campaign_id)
+            .where(
+                CampaignSchedule.campaign_id == campaign_id,
+                CampaignSchedule.user_id == user.id
+            )
         )
         campaign_schedule = result.scalar_one_or_none()
         if not campaign_schedule:
