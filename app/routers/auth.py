@@ -27,6 +27,8 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](
     [auth_backend],
 )
 
+current_active_user = fastapi_users.current_user(active=True)
+
 google_client = GoogleOAuth2(
     client_id=settings.GOOGLE_CLIENT_ID,
     client_secret=settings.GOOGLE_CLIENT_SECRET,
