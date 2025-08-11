@@ -1,11 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 import httpx
 
+from app.routers.auth import current_active_user
 from app.utils.httpx import get_httpx_headers, httpx_base_url
 
 router = APIRouter()
 
-@router.get("/info")
 async def get_user_info():
     try:
         async with httpx.AsyncClient() as client:
@@ -17,5 +17,16 @@ async def get_user_info():
 
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/info")
+async def get_user_info_db(user = Depends(current_active_user)):
+    try:
+        return {
+            "credit": user.total_credit,
+            "used_credit": user.used_credit,
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
