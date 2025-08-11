@@ -67,7 +67,7 @@ async def create_agent(agent: AgentCreate, db: AsyncSession = Depends(get_db), u
                 await db.refresh(db_agent)
             except Exception as e:
                 print(f"Error while saving agent: {str(e)}")
-            return response.json()
+            return data
         except HTTPException:
             raise
         except Exception as e:

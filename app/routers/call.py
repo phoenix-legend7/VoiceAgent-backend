@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import httpx
 
+from app.routers.auth import current_active_user
 from app.utils.httpx import get_httpx_headers, httpx_base_url
 from app.schemas import AgentGet
 
@@ -23,7 +24,7 @@ class StartOutboundCallRequest(BaseModel):
     session_continuation: dict = None
 
 @router.post("/register_call")
-async def register_call(register_call_request: RegisterCallRequest):
+async def register_call(register_call_request: RegisterCallRequest, _ = Depends(current_active_user)):
     try:
         agent = register_call_request.agent.model_dump() if register_call_request.agent else None
         data = {
@@ -48,7 +49,7 @@ async def register_call(register_call_request: RegisterCallRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/register_sip_call")
-async def register_sip_call(register_sip_call_request: RegisterCallRequest):
+async def register_sip_call(register_sip_call_request: RegisterCallRequest, _ = Depends(current_active_user)):
     try:
         agent = register_sip_call_request.agent.model_dump() if register_sip_call_request.agent else None
         data = {
@@ -73,7 +74,7 @@ async def register_sip_call(register_sip_call_request: RegisterCallRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sessions/{session_id}/terminate")
-async def terminate_session(session_id: str, terminate_session_request: TerminateSessionRequest):
+async def terminate_session(session_id: str, terminate_session_request: TerminateSessionRequest, _ = Depends(current_active_user)):
     try:
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
@@ -88,7 +89,7 @@ async def terminate_session(session_id: str, terminate_session_request: Terminat
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/start_outbound_call")
-async def start_outbound_call(start_outbound_call_request: StartOutboundCallRequest):
+async def start_outbound_call(start_outbound_call_request: StartOutboundCallRequest, _ = Depends(current_active_user)):
     try:
         agent = start_outbound_call_request.agent.model_dump() if start_outbound_call_request.agent else None
         data = {
