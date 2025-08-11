@@ -7,7 +7,7 @@ from typing import Optional
 import uuid
 from app.core.config import settings
 from app.models import User, OAuthAccount
-from app.core.database import SessionLocal
+from app.core.database import get_db
 
 class UserDatabase(SQLAlchemyUserDatabase[User, OAuthAccount]):
     async def get_by_oauth_account(self, oauth: str, account_id: str) -> Optional[User]:
@@ -30,9 +30,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def on_after_register(self, user: User, request=None):
         print(f"User {user.id} has registered.")
 
-async def get_user_db():
-    async with SessionLocal() as session:
-        yield UserDatabase(session, User, OAuthAccount)
+async def get_user_db(session = Depends(get_db)):
+    yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
 async def get_user_manager(user_db=Depends(get_user_db)):
     yield UserManager(user_db)

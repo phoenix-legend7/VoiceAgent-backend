@@ -1,5 +1,5 @@
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlalchemy import String, ForeignKey
+from sqlalchemy import Float, String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional
 import uuid
@@ -20,6 +20,11 @@ class OAuthAccount(Base):
 class User(SQLAlchemyBaseUserTableUUID, Base):
     __tablename__ = "user"
 
+    first_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    avatar: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    total_credit: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0)
+    used_credit: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0)
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship(
         "OAuthAccount", cascade="all, delete-orphan", lazy="joined"
     )

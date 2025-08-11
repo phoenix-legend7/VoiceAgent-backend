@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(get_next_logs, trigger='interval', seconds=10, id='get_next_logs')
     
     # Start scheduler
-    # scheduler.start()
+    scheduler.start()
     
     # Initialize database
     await init_models()
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     check_folder_exist()
     
     # Start background task in the same event loop
-    # logs_task = asyncio.create_task(get_all_logs())
+    logs_task = asyncio.create_task(get_all_logs())
     
     yield
     
@@ -53,11 +53,11 @@ async def lifespan(app: FastAPI):
     campaign_scheduler.shutdown()
     
     # Cancel and wait for background task
-    # logs_task.cancel()
-    # try:
-    #     await logs_task
-    # except asyncio.CancelledError:
-    #     pass
+    logs_task.cancel()
+    try:
+        await logs_task
+    except asyncio.CancelledError:
+        pass
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -69,7 +69,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,4 +85,4 @@ async def root():
 import uvicorn
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
