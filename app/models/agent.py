@@ -8,5 +8,6 @@ class Agent(Base):
     id = Column(String, primary_key=True,unique=True, nullable=False)
     name = Column(Text)
     config = Column(JSON, nullable=True)
+    sip = Column(JSON, nullable=False, default={})
     created_at = Column(BigInteger, nullable=True)
     user_id = Column(UUID(as_uuid=True), nullable=True)
