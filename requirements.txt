@@ -13,3 +13,4 @@ psycopg2-binary==2.9.10
 asyncpg==0.30.0
 apscheduler==3.11.0
 nest-asyncio==1.6.0
+fastapi-users==14.0.1

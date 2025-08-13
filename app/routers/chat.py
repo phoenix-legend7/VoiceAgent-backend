@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from io import BytesIO
 import httpx
 
+from app.routers.auth import current_active_user
 from app.utils.httpx import get_httpx_headers, httpx_base_url
 from app.schemas import AgentGet
 
@@ -14,7 +15,7 @@ class ChatRequest(BaseModel):
     agent: AgentGet
 
 @router.post("/completions")
-async def chat(chat_request: ChatRequest):
+async def chat(chat_request: ChatRequest, _ = Depends(current_active_user)):
     try:
         agent = chat_request.agent.model_dump()
         data = {

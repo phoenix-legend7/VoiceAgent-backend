@@ -6,7 +6,8 @@ import asyncio
 import httpx
 
 from app.core.database import get_db, get_db_background
-from app.models.call_log import CallLog
+from app.models import Agent, CallLog
+from app.routers.auth import current_active_user
 # from app.utils.log import log_call_log
 from app.utils.httpx import get_httpx_headers, httpx_base_url
 
@@ -158,10 +159,15 @@ async def get_logs(
     phone_number: str = None,
     start_time: float = None,
     end_time: float = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user = Depends(current_active_user)
 ):
     try:
-        query = select(CallLog)
+        query = (
+            select(CallLog)
+            .join(Agent, CallLog.agent_id == Agent.id)  # join so we can filter by user
+            .where(Agent.user_id == user.id)            # filter to current user
+        )
         if start_after_ts:
             query = query.where(CallLog.ts <= start_after_ts)
         if agent_id:
@@ -182,7 +188,7 @@ async def get_logs(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{session_id}")
-async def get_call_log(session_id: str, db: AsyncSession = Depends(get_db)):
+async def get_call_log(session_id: str, db: AsyncSession = Depends(get_db), _ = Depends(current_active_user)):
     try:
         result = await db.execute(select(CallLog).where(CallLog.session_id == session_id))
         log = result.scalar_one_or_none()
@@ -196,7 +202,7 @@ async def get_call_log(session_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{session_id}")
-async def delete_call_log(session_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_call_log(session_id: str, db: AsyncSession = Depends(get_db), _ = Depends(current_active_user)):
     try:
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()

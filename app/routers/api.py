@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from app.core.config import settings
 from app.routers import (
+    auth,
     health,
     agent,
     chat,
@@ -18,6 +19,7 @@ from app.routers import (
 
 api_router = APIRouter(prefix=settings.API_V1_STR)
 
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(agent.router, prefix="/agent", tags=["agent"])

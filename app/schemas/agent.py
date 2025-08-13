@@ -1,6 +1,4 @@
-# Agent Schema
 from pydantic import BaseModel
-from typing import Optional, List
 
 class AgentBase(BaseModel):
     name: str
@@ -19,5 +17,3 @@ class AgentGet(AgentBase):
     id: str
     created_at: int
     pass
-
-

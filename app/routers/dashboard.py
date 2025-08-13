@@ -5,8 +5,9 @@ from datetime import datetime, timezone, timedelta
 import itertools
 
 from app.core.database import get_db
-from app.models.call_log import CallLog
+from app.models import Agent, CallLog
 from app.routers.agent import get_agents
+from app.routers.auth import current_active_user
 
 router = APIRouter()
 
@@ -60,11 +61,16 @@ def calc_success_logs(rows):
 async def get_dashboard_data(
     agent_id: str = None,
     time_period: str = "today", # today, week, month, quarter
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user = Depends(current_active_user)
 ):
     try:
         agents: list = await get_agents()
-        query = select(CallLog)
+        query = (
+            select(CallLog)
+            .join(Agent, CallLog.agent_id == Agent.id)  # join so we can filter by user
+            .where(Agent.user_id == user.id)            # filter to current user
+        )
         if agent_id:
             query = query.where(CallLog.agent_id == agent_id)
         if time_period:
