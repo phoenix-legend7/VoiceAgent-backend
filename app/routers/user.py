@@ -19,14 +19,3 @@ async def get_user_info():
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/info")
-async def get_user_info_db(user = Depends(current_active_user)):
-    try:
-        return {
-            "credit": user.total_credit,
-            "used_credit": user.used_credit,
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
