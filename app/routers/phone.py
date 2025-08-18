@@ -320,7 +320,8 @@ async def purchase_phone_number(
             else:
                 area_code = request.area_code
             timestamp = int(datetime.now().timestamp())
-            phone_number = f"+{country_codes[request.country]}{area_code}_{timestamp}"
+            # phone_number = f"+{country_codes[request.country]}{area_code}_{timestamp}"
+            phone_number = response.text
             db_phone = Phone(
                 id = phone_number,
                 created_at = int(datetime.now(timezone.utc).timestamp()),
@@ -338,7 +339,7 @@ async def purchase_phone_number(
                 await db.refresh(db_phone)
             except Exception as e:
                 print(f"Error while saving phone: {str(e)}")
-            return response.text
+            return phone_number
 
     except HTTPException:
         raise
