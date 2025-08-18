@@ -106,13 +106,9 @@ async def get_phone(phone_id: str):
 @router.get("/phones")
 async def get_phones_db(db: AsyncSession = Depends(get_db), user = Depends(current_active_user)):
     try:
-        async with httpx.AsyncClient() as client:
-            headers = get_httpx_headers()
-            response = await client.get(f"{httpx_base_url}/phones", headers=headers)
-            if response.status_code != 200 and response.status_code != 201:
-                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
-            return response.json()
-
+        result = await db.execute(select(Phone).where(Phone.user_id == user.id))
+        db_phone = result.scalars().all()
+        return db_phone
     except HTTPException:
         raise
     except Exception as e:
@@ -125,12 +121,10 @@ async def get_phone_db(
     user = Depends(current_active_user)
 ):
     try:
-        async with httpx.AsyncClient() as client:
-            headers = get_httpx_headers()
-            response = await client.get(f"{httpx_base_url}/phone/{phone_id}", headers=headers)
-            if response.status_code != 200 and response.status_code != 201:
-                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
-            return response.json()
+        result = await db.execute(select(Phone).where(Phone.id == phone_id, Phone.user_id == user.id))
+        db_phone = result.scalar_one_or_none()
+        if not db_phone:
+            raise HTTPException(status_code=404, detail=f"Not found phone {phone_id}")
 
     except HTTPException:
         raise
