@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import httpx
+import httpx, json
 
 from app.core.database import get_db
 from app.models import Knowledge
@@ -57,7 +57,7 @@ async def create_file(
     try:
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
-            response = await client.post(f"{httpx_base_url}/knowledge/create_file", json=create_file_request.model_dump(), headers=headers)
+            response = await client.post(f"{httpx_base_url}/knowledge/create_file", data=json.dumps(create_file_request.model_dump()), headers=headers)
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             id = create_file_request.object_key.split("/")[1].split("_")[0]
@@ -76,7 +76,7 @@ async def create_file(
                 await db.refresh(db_knowledge)
             except Exception as e:
                 print(f"Error while saving knowledge: {str(e)}")
-            return response.text
+            return response.json()
 
     except HTTPException:
         raise
