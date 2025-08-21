@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import httpx
 
 from app.core.database import get_db
-from app.models import Phone
+from app.models import Phone, User
 from app.routers.auth import current_active_user
 from app.utils.httpx import get_httpx_headers, httpx_base_url
 
@@ -297,24 +297,14 @@ async def purchase_phone_number(
     user = Depends(current_active_user)
 ):
     try:
+        remain_credit = user.total_credit - user.used_credit
+        if remain_credit < 3000:
+            raise HTTPException(status_code=400, detail="You don't have enough credit")
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
             response = await client.post(f"{httpx_base_url}/phones/purchase", json=request.model_dump(), headers=headers)
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
-            country_codes = {
-                "US": "1",
-                "CA": "1",
-                "AU": "61",
-                "PR": "1",
-            }
-            if request.country == "PR":
-                area_code = "787"
-                # area_code = "939"
-            else:
-                area_code = request.area_code
-            timestamp = int(datetime.now().timestamp())
-            # phone_number = f"+{country_codes[request.country]}{area_code}_{timestamp}"
             phone_number = response.text
             db_phone = Phone(
                 id = phone_number,
@@ -328,6 +318,14 @@ async def purchase_phone_number(
                 postal_code = request.postal_code,
             )
             db.add(db_phone)
+            # Increment user's used credit after successful purchase
+            try:
+                result = await db.execute(select(User).where(User.id == user.id))
+                db_user = result.scalar_one_or_none()
+                if db_user:
+                    db_user.used_credit = (db_user.used_credit or 0) + 3000
+            except Exception as e:
+                print(f"Error while updating user credit: {str(e)}")
             try:
                 await db.commit()
                 await db.refresh(db_phone)
