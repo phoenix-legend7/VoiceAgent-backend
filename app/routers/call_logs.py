@@ -6,7 +6,7 @@ import asyncio
 import httpx
 
 from app.core.database import get_db, get_db_background
-from app.models import Agent, CallLog
+from app.models import Agent, CallLog, User
 from app.routers.auth import current_active_user
 # from app.utils.log import log_call_log
 from app.utils.httpx import get_httpx_headers, httpx_base_url
@@ -48,6 +48,8 @@ async def save_histories(histories: list):
     try:
         async with get_db_background() as session:
             for history in histories:
+                agent_id = history.get("agent_id")
+                cost_breakdown = history.get("cost_breakdown")
                 call_log = CallLog(
                     agent_id = history.get("agent_id") or None,
                     agent_config = history.get("agent_config") or None,
@@ -57,7 +59,7 @@ async def save_histories(histories: list):
                     chars_used = history.get("chars_used") or None,
                     session_id = history.get("session_id") or None,
                     call_id = history.get("call_id") or None,
-                    cost_breakdown = history.get("cost_breakdown") or None,
+                    cost_breakdown = cost_breakdown or None,
                     voip = history.get("voip") or None,
                     recording = history.get("recording") or None,
                     call_metadata = history.get("metadata") or None,
@@ -65,6 +67,20 @@ async def save_histories(histories: list):
                     call_status = history.get("call_status") or None,
                 )
                 session.add(call_log)
+                if not agent_id:
+                    continue
+                result = await session.execute(
+                    select(User)
+                    .join(Agent, User.id == Agent.user_id)
+                    .where(Agent.id == agent_id)
+                )
+                db_user = result.unique().scalar_one_or_none()
+                if not db_user:
+                    continue
+                cost = 0
+                if cost_breakdown:
+                    cost = sum((item.get("credit") or 0) for item in cost_breakdown)
+                db_user.used_credit = (db_user.used_credit or 0) + cost
             try:
                 await session.commit()
             except Exception as e:
