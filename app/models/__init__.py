@@ -7,3 +7,4 @@ from .campaign import Campaign
 from .knowledge import Knowledge
 from .user import User, OAuthAccount
 from .phone import Phone
+from .tool import Tools
