@@ -323,7 +323,7 @@ async def purchase_phone_number(
                 result = await db.execute(select(User).where(User.id == user.id))
                 db_user = result.scalar_one_or_none()
                 if db_user:
-                    db_user.used_credit = (db_user.used_credit or 0) + 3000
+                    db_user.used_credit = (db_user.used_credit or 0) + 300
             except Exception as e:
                 print(f"Error while updating user credit: {str(e)}")
             try:
