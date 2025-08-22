@@ -11,6 +11,7 @@ from app.utils.log import check_folder_exist
 from app.routers.api import api_router
 from app.routers.call_logs import get_all_logs, get_next_logs
 from app.services.campaign_scheduler import campaign_scheduler
+from app.routers.stripe import process_all_auto_refills
 
 # Apply nest_asyncio to allow nested event loops
 nest_asyncio.apply()
@@ -29,7 +30,10 @@ async def lifespan(app: FastAPI):
     
     # Add jobs to scheduler
     scheduler.add_job(get_next_logs, trigger='interval', seconds=10, id='get_next_logs')
-    
+
+    # Call internal coroutine directly instead of HTTP
+    scheduler.add_job(process_all_auto_refills, trigger='interval', minutes=30, id='check_auto_refills')
+
     # Start scheduler
     scheduler.start()
     
@@ -49,6 +53,7 @@ async def lifespan(app: FastAPI):
     
     # Cleanup
     scheduler.remove_job('get_next_logs')
+    scheduler.remove_job('check_auto_refills')
     scheduler.shutdown()
     campaign_scheduler.shutdown()
     

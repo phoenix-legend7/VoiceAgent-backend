@@ -28,6 +28,8 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     auto_refill: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=False, default=False)
     auto_refill_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0)
     auto_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    default_payment_method: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship(
         "OAuthAccount", cascade="all, delete-orphan", lazy="joined"
     )
