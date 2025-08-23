@@ -15,13 +15,5 @@ class Tools(Base):
     webhook = Column(Text, nullable=True)
     header = Column(JSONB, nullable=True)
     method = Column(Text, nullable=True)
-    timeout = Column(Integer, nullable=True)
-    run_after_call = Column(Boolean, nullable=True)
-    messages = Column(JSONB, nullable=True)  # list of strings
-    response_mode = Column(Text, nullable=True)  # "strict" | "flexible"
-    execute_after_message = Column(Boolean, nullable=True)
-    exclude_session_id = Column(Boolean, nullable=True)
-    file_type = Column(Text, nullable=True)
-    size = Column(BigInteger, nullable=True)
     created_at = Column(BigInteger, nullable=True)
     user_id = Column(UUID(as_uuid=True), nullable=True)

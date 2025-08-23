@@ -55,12 +55,6 @@ class ToolCreateRequest(BaseModel):
     webhook: str | None = None
     header: dict | None = None
     method: str | None = None
-    timeout: int | None = None
-    run_after_call: bool | None = None
-    messages: list[str] | None = None
-    response_mode: str | None = None
-    execute_after_message: bool | None = None
-    exclude_session_id: bool | None = None
 
 
 class ToolUpdateRequest(BaseModel):
@@ -70,19 +64,34 @@ class ToolUpdateRequest(BaseModel):
     webhook: str | None = None
     header: dict | None = None
     method: str | None = None
-    timeout: int | None = None
-    run_after_call: bool | None = None
-    messages: list[str] | None = None
-    response_mode: str | None = None
-    execute_after_message: bool | None = None
-    exclude_session_id: bool | None = None
 
 
 @router.get("/")
 async def list_tools(db: AsyncSession = Depends(get_db), user = Depends(current_active_user)):
     try:
-        result = await db.execute(select(Tools).where(Tools.user_id == user.id))
-        return result.scalars().all()
+        result = await db.execute(
+            select(Tools.id, Tools.tool_id, Tools.name, Tools.description).where(Tools.user_id == user.id)
+        )
+        tools = result.all()
+        return [
+            {
+                "id": tool.id,
+                "tool_id": tool.tool_id,
+                "name": tool.name,
+                "description": tool.description
+            }
+            for tool in tools
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/custom")
+async def list_custom_tools(db: AsyncSession = Depends(get_db), user = Depends(current_active_user)):
+    try:
+        result = await db.execute(select(Tools).where(Tools.tool_id == "custom", Tools.user_id == user.id))
+        tools = result.scalars().all()
+        return tools
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -94,24 +103,30 @@ async def get_tool(tool_id: str, db: AsyncSession = Depends(get_db), user = Depe
         tool = result.scalar_one_or_none()
         if not tool:
             raise HTTPException(status_code=404, detail=f"Not found tool {tool_id}")
-        return tool
+        return {
+            "id": tool.id,
+            "tool_id": tool.tool_id,
+            "name": tool.name,
+            "description": tool.description,
+            "created_at": tool.created_at,
+        }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/{tool_id}")
+@router.patch("/{id}")
 async def update_tool(
-    tool_id: str,
+    id: str,
     request: ToolUpdateRequest,
     db: AsyncSession = Depends(get_db),
     user = Depends(current_active_user)
 ):
-    result = await db.execute(select(Tools).where(Tools.tool_id == tool_id, Tools.user_id == user.id))
+    result = await db.execute(select(Tools).where(Tools.id == id, Tools.tool_id == "custom", Tools.user_id == user.id))
     db_tool = result.scalar_one_or_none()
     if not db_tool:
-        raise HTTPException(status_code=404, detail=f"Not found tool {tool_id}")
+        raise HTTPException(status_code=404, detail=f"Not found tool {id}")
     try:
         if request.name is not None:
             db_tool.name = request.name
@@ -125,18 +140,6 @@ async def update_tool(
             db_tool.header = request.header
         if request.method is not None:
             db_tool.method = request.method
-        if request.timeout is not None:
-            db_tool.timeout = request.timeout
-        if request.run_after_call is not None:
-            db_tool.run_after_call = request.run_after_call
-        if request.messages is not None:
-            db_tool.messages = request.messages
-        if request.response_mode is not None:
-            db_tool.response_mode = request.response_mode
-        if request.execute_after_message is not None:
-            db_tool.execute_after_message = request.execute_after_message
-        if request.exclude_session_id is not None:
-            db_tool.exclude_session_id = request.exclude_session_id
 
         await db.commit()
         await db.refresh(db_tool)
@@ -145,12 +148,12 @@ async def update_tool(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{tool_id}")
-async def delete_tool(tool_id: str, db: AsyncSession = Depends(get_db), user = Depends(current_active_user)):
-    result = await db.execute(select(Tools).where(Tools.tool_id == tool_id, Tools.user_id == user.id))
+@router.delete("/{id}")
+async def delete_tool(id: str, db: AsyncSession = Depends(get_db), user = Depends(current_active_user)):
+    result = await db.execute(select(Tools).where(Tools.id == id, Tools.user_id == user.id))
     db_tool = result.scalar_one_or_none()
     if not db_tool:
-        raise HTTPException(status_code=404, detail=f"Not found tool {tool_id}")
+        raise HTTPException(status_code=404, detail=f"Not found tool {id}")
     try:
         await db.delete(db_tool)
         await db.commit()
@@ -176,20 +179,19 @@ async def create_tool(
         description = (
             request.description if tool_id == "custom" and request.description is not None else (defaults["description"] if defaults else "User-defined tool")
         )
-        db_tool = Tools(
-            tool_id=tool_id,
-            name=name,
-            description=description,
-            messages = request.messages,
-            response_mode = request.response_mode,
-            timeout = request.timeout,
-            run_after_call = request.run_after_call,
-            execute_after_message = request.execute_after_message,
-            exclude_session_id = request.exclude_session_id,
-            created_at=int(datetime.now(timezone.utc).timestamp()),
-            user_id=user.id,
-        )
-        
+        result = await db.execute(select(Tools).where(Tools.tool_id == tool_id, Tools.user_id == user.id))
+        db_tool = result.scalar_one_or_none()
+        is_in_db = True
+        if not db_tool:
+            is_in_db = False
+            db_tool = Tools(
+                tool_id=tool_id,
+                name=name,
+                description=description,
+                created_at=int(datetime.now(timezone.utc).timestamp()),
+                user_id=user.id,
+            )
+
         if tool_id == "email":
             # Email integration - requires SMTP configuration
             db_tool.method = "POST"
@@ -408,15 +410,21 @@ async def create_tool(
             ]
 
         elif tool_id == "custom":
+            if not name:
+                raise HTTPException(status_code=400, detail="Name is required")
+            if not description:
+                raise HTTPException(status_code=400, detail="Description is required")
+            if not request.webhook:
+                raise HTTPException(status_code=400, detail="Webhook URL is required")
+            db_tool.webhook = request.webhook
             if request.params is not None:
                 db_tool.params = [p.model_dump() for p in request.params]
-            if request.webhook is not None:
-                db_tool.webhook = request.webhook
             if request.header is not None:
                 db_tool.header = request.header
             db_tool.method = request.method or "GET"
 
-        db.add(db_tool)
+        if not is_in_db:
+            db.add(db_tool)
         await db.commit()
         await db.refresh(db_tool)
         return {"id": str(db_tool.id)}
