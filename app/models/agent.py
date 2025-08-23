@@ -9,5 +9,6 @@ class Agent(Base):
     name = Column(Text)
     config = Column(JSON, nullable=True)
     sip = Column(JSON, nullable=False, default={})
+    tools = Column(JSON, nullable=False, default=[])
     created_at = Column(BigInteger, nullable=True)
     user_id = Column(UUID(as_uuid=True), nullable=True)

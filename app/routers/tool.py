@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 
 from app.core.database import get_db
-from app.models import Tools
+from app.models import Agent, Tools
 from app.routers.auth import current_active_user
 
 router = APIRouter()
@@ -127,6 +127,23 @@ async def update_tool(
     db_tool = result.scalar_one_or_none()
     if not db_tool:
         raise HTTPException(status_code=404, detail=f"Not found tool {id}")
+
+    # Check if the tool is connected to any agents
+    result = await db.execute(select(Agent).where(Agent.user_id == user.id))
+    agents = result.scalars().all()
+
+    connected_agents = []
+    for agent in agents:
+        if agent.tools and str(id) in agent.tools:
+            connected_agents.append(agent.name)
+
+    if connected_agents:
+        agent_names = ", ".join(connected_agents)
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot update tool. It is connected to the following agent(s): {agent_names}"
+        )
+
     try:
         if request.name is not None:
             db_tool.name = request.name
@@ -154,6 +171,23 @@ async def delete_tool(id: str, db: AsyncSession = Depends(get_db), user = Depend
     db_tool = result.scalar_one_or_none()
     if not db_tool:
         raise HTTPException(status_code=404, detail=f"Not found tool {id}")
+
+    # Check if the tool is connected to any agents
+    result = await db.execute(select(Agent).where(Agent.user_id == user.id))
+    agents = result.scalars().all()
+
+    connected_agents = []
+    for agent in agents:
+        if agent.tools and str(id) in agent.tools:
+            connected_agents.append(agent.name)
+
+    if connected_agents:
+        agent_names = ", ".join(connected_agents)
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot delete tool. It is connected to the following agent(s): {agent_names}"
+        )
+
     try:
         await db.delete(db_tool)
         await db.commit()
