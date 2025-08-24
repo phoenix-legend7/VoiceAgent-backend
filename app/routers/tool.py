@@ -265,7 +265,7 @@ async def create_tool(
             db_tool.params = [
                 {"name": "to", "required": True, "type": "string", "description": "Recipient phone number in international format"},
                 {"name": "type", "required": True, "type": "string", "description": "Message type (text, template, etc.)"},
-                {"name": "message", "required": False, "type": "object", "description": "Message payload depending on type"},
+                {"name": "message", "required": False, "type": "string", "description": "Message payload depending on type"},
             ]
 
         elif tool_id == "woocommerce":
@@ -285,7 +285,7 @@ async def create_tool(
             db_tool.params = [
                 {"name": "endpoint", "required": True, "type": "string", "description": "API endpoint (e.g., products, orders, customers)"},
                 {"name": "id", "required": False, "type": "string", "description": "Resource ID for specific operations"},
-                {"name": "data", "required": False, "type": "object", "description": "Data payload for POST/PUT operations"},
+                {"name": "data", "required": False, "type": "string", "description": "Data payload for POST/PUT operations"},
             ]
 
         elif tool_id == "shopify":
@@ -304,7 +304,7 @@ async def create_tool(
             db_tool.params = [
                 {"name": "endpoint", "required": True, "type": "string", "description": "API endpoint (e.g., products, orders, customers)"},
                 {"name": "id", "required": False, "type": "string", "description": "Resource ID for specific operations"},
-                {"name": "data", "required": False, "type": "object", "description": "Data payload for POST/PUT operations"},
+                {"name": "data", "required": False, "type": "string", "description": "Data payload for POST/PUT operations"},
             ]
 
         elif tool_id == "pipedrive":
@@ -323,7 +323,7 @@ async def create_tool(
             db_tool.params = [
                 {"name": "endpoint", "required": True, "type": "string", "description": "API endpoint (e.g., persons, deals, organizations)"},
                 {"name": "id", "required": False, "type": "string", "description": "Resource ID for specific operations"},
-                {"name": "data", "required": False, "type": "object", "description": "Data payload for POST/PUT operations"},
+                {"name": "data", "required": False, "type": "string", "description": "Data payload for POST/PUT operations"},
             ]
 
         elif tool_id == "hubspot":
@@ -341,7 +341,7 @@ async def create_tool(
             db_tool.params = [
                 {"name": "endpoint", "required": True, "type": "string", "description": "API endpoint (e.g., crm/v3/objects/contacts, crm/v3/objects/deals)"},
                 {"name": "id", "required": False, "type": "string", "description": "Resource ID for specific operations"},
-                {"name": "data", "required": False, "type": "object", "description": "Data payload for POST/PUT operations"},
+                {"name": "data", "required": False, "type": "string", "description": "Data payload for POST/PUT operations"},
             ]
 
         elif tool_id == "salesforce":
@@ -360,7 +360,7 @@ async def create_tool(
             db_tool.params = [
                 {"name": "endpoint", "required": True, "type": "string", "description": "API endpoint (e.g., sobjects/Contact, sobjects/Account)"},
                 {"name": "id", "required": False, "type": "string", "description": "Record ID for specific operations"},
-                {"name": "data", "required": False, "type": "object", "description": "Data payload for POST/PUT operations"},
+                {"name": "data", "required": False, "type": "string", "description": "Data payload for POST/PUT operations"},
             ]
 
         elif tool_id == "google-calendar":
@@ -379,7 +379,7 @@ async def create_tool(
             db_tool.params = [
                 {"name": "endpoint", "required": True, "type": "string", "description": "API endpoint (e.g., events, freeBusy)"},
                 {"name": "id", "required": False, "type": "string", "description": "Event ID for specific operations"},
-                {"name": "data", "required": False, "type": "object", "description": "Event data for POST/PUT operations"},
+                {"name": "data", "required": False, "type": "string", "description": "Event data for POST/PUT operations"},
             ]
 
         elif tool_id == "calendly":
@@ -397,7 +397,7 @@ async def create_tool(
             db_tool.params = [
                 {"name": "endpoint", "required": True, "type": "string", "description": "API endpoint (e.g., scheduled_events, event_types)"},
                 {"name": "id", "required": False, "type": "string", "description": "Resource ID for specific operations"},
-                {"name": "data", "required": False, "type": "object", "description": "Data payload for POST/PUT operations"},
+                {"name": "data", "required": False, "type": "string", "description": "Data payload for POST/PUT operations"},
             ]
 
         elif tool_id == "acuity-scheduling":
@@ -416,7 +416,7 @@ async def create_tool(
             db_tool.params = [
                 {"name": "endpoint", "required": True, "type": "string", "description": "API endpoint (e.g., appointments, appointment-types)"},
                 {"name": "id", "required": False, "type": "string", "description": "Resource ID for specific operations"},
-                {"name": "data", "required": False, "type": "object", "description": "Data payload for POST/PUT operations"},
+                {"name": "data", "required": False, "type": "string", "description": "Data payload for POST/PUT operations"},
             ]
 
         elif tool_id == "make":
@@ -427,7 +427,7 @@ async def create_tool(
 
             db_tool.webhook = webhook_url
             db_tool.params = [
-                {"name": "data", "required": True, "type": "object", "description": "Data to send to Make.com webhook"},
+                {"name": "data", "required": True, "type": "string", "description": "Data to send to Make.com webhook"},
             ]
 
         elif tool_id == "zapier":
@@ -438,7 +438,7 @@ async def create_tool(
 
             db_tool.webhook = webhook_url
             db_tool.params = [
-                {"name": "data", "required": True, "type": "object", "description": "Data to send to Zapier webhook"},
+                {"name": "data", "required": True, "type": "string", "description": "Data to send to Zapier webhook"},
             ]
 
         elif tool_id == "custom":

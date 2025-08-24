@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import json, httpx
+import json, httpx, re
 
 from app.core.database import get_db
 from app.models import Agent, Tools
@@ -13,7 +13,7 @@ from app.utils.httpx import get_httpx_headers, httpx_base_url
 
 class AgentToolRequest(BaseModel):
     id: str
-    timeout: float = None
+    timeout: int = None
     run_after_call: bool = None
     messages: list[str] = None
     response_mode: str = None
@@ -48,6 +48,18 @@ async def get_agent_by_id(agent_id: str):
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+def to_function_name(text: str) -> str:
+    # Lowercase the text
+    text = text.lower()
+    # Replace spaces and invalid characters with underscores
+    text = re.sub(r'[^a-z0-9_]', '_', text)
+    # Ensure it doesn't start with a number
+    if re.match(r'^[0-9]', text):
+        text = "_" + text
+    # Collapse multiple underscores
+    text = re.sub(r'_+', '_', text).strip('_')
+    return text
 
 @router.get("/")
 async def get_agents_db(db: AsyncSession = Depends(get_db), user = Depends(current_active_user)):
@@ -136,7 +148,7 @@ async def update_agent_tool(
         if not db_tool:
             raise HTTPException(status_code=404, detail=f"Not found tool {tool.id}")
         agent_tool = {
-            "name": db_tool.name,
+            "name": to_function_name(db_tool.name) if db_tool.tool_id == "custom" else to_function_name(db_tool.tool_id),
             "description": db_tool.description,
             "webhook": db_tool.webhook,
             "method": db_tool.method,
