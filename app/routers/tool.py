@@ -66,6 +66,32 @@ class ToolUpdateRequest(BaseModel):
     method: str | None = None
 
 
+async def raise_for_tool(
+    tool_id: str,
+    db: AsyncSession,
+    user
+):
+    # Check if the tool is connected to any agents
+    result = await db.execute(select(Agent).where(Agent.user_id == user.id))
+    agents = result.scalars().all()
+
+    connected_agents = []
+    for agent in agents:
+        if agent.tools:
+            # agent.tools is now a list of AgentToolRequest objects with 'id' field
+            for tool in agent.tools:
+                if tool.get('id') == tool_id:
+                    connected_agents.append(agent.name)
+                    break
+
+    if connected_agents:
+        agent_names = ", ".join(connected_agents)
+        raise HTTPException(
+            status_code=400, 
+            detail=f"It is connected to the following agent(s): {agent_names}"
+        )
+
+
 @router.get("/")
 async def list_tools(db: AsyncSession = Depends(get_db), user = Depends(current_active_user)):
     try:
@@ -128,21 +154,7 @@ async def update_tool(
     if not db_tool:
         raise HTTPException(status_code=404, detail=f"Not found tool {id}")
 
-    # Check if the tool is connected to any agents
-    result = await db.execute(select(Agent).where(Agent.user_id == user.id))
-    agents = result.scalars().all()
-
-    connected_agents = []
-    for agent in agents:
-        if agent.tools and str(id) in agent.tools:
-            connected_agents.append(agent.name)
-
-    if connected_agents:
-        agent_names = ", ".join(connected_agents)
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Cannot update tool. It is connected to the following agent(s): {agent_names}"
-        )
+    raise_for_tool(id, db, user)
 
     try:
         if request.name is not None:
@@ -172,21 +184,7 @@ async def delete_tool(id: str, db: AsyncSession = Depends(get_db), user = Depend
     if not db_tool:
         raise HTTPException(status_code=404, detail=f"Not found tool {id}")
 
-    # Check if the tool is connected to any agents
-    result = await db.execute(select(Agent).where(Agent.user_id == user.id))
-    agents = result.scalars().all()
-
-    connected_agents = []
-    for agent in agents:
-        if agent.tools and str(id) in agent.tools:
-            connected_agents.append(agent.name)
-
-    if connected_agents:
-        agent_names = ", ".join(connected_agents)
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Cannot delete tool. It is connected to the following agent(s): {agent_names}"
-        )
+    raise_for_tool(id, db, user)
 
     try:
         await db.delete(db_tool)

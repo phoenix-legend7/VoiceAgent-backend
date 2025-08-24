@@ -104,7 +104,7 @@ async def update_agent(agent_id: str, agent: AgentUpdate, db: AsyncSession = Dep
             headers = get_httpx_headers()
             response = await client.put(f"{httpx_base_url}/agents/{agent_id}", data=json.dumps(agent.model_dump()), headers=headers)
             if response.status_code != 200 and response.status_code != 201:
-                raise HTTPException(statu_code=response.status_code, detail=response.text or "Unknown Error")
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             db_agent.config = {**db_agent.config, **agent.config}
             try:
                 await db.commit()
@@ -170,9 +170,9 @@ async def update_agent_tool(
             }
             response = await client.put(f"{httpx_base_url}/agents/{agent_id}", data=json.dumps(payload), headers=headers)
             if response.status_code != 200 and response.status_code != 201:
-                raise HTTPException(statu_code=response.status_code, detail=response.text or "Unknown Error")
+                raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             db_agent.config = {**db_agent.config, "tools": agent_tools}
-            db_agent.tools = [tool.id for tool in tools]
+            db_agent.tools = tools
             try:
                 await db.commit()
                 await db.refresh(db_agent)
