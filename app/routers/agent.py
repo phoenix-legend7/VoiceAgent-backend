@@ -13,12 +13,12 @@ from app.utils.httpx import get_httpx_headers, httpx_base_url
 
 class AgentToolRequest(BaseModel):
     id: str
-    timeout: int = None
-    run_after_call: bool = None
-    messages: list[str] = None
-    response_mode: str = None
-    execute_after_message: bool = None
-    exclude_session_id: bool = None
+    timeout: int | None = None
+    run_after_call: bool | None = None
+    messages: list[str] | None = None
+    response_mode: str | None = None
+    execute_after_message: bool | None = None
+    exclude_session_id: bool | None = None
 
 
 router = APIRouter()
@@ -184,7 +184,9 @@ async def update_agent_tool(
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             db_agent.config = {**db_agent.config, "tools": agent_tools}
-            db_agent.tools = tools
+            # Convert tools to dict format for database storage
+            tools_data = [tool.model_dump() for tool in tools]
+            db_agent.tools = tools_data
             try:
                 await db.commit()
                 await db.refresh(db_agent)
