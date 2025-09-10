@@ -4,6 +4,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 import asyncio
 import httpx
+import os
 
 from app.core.database import get_db, get_db_background
 from app.models import Agent, CallLog, User
@@ -12,6 +13,11 @@ from app.routers.auth import current_active_user
 from app.utils.httpx import get_httpx_headers, httpx_base_url
 
 router = APIRouter()
+
+try:
+    margin_rate = float(os.getenv("MARGIN_RATE", "0"))
+except Exception:
+    margin_rate = 0.2
 
 async def get_end_time():
     try:
@@ -50,6 +56,17 @@ async def save_histories(histories: list):
             for history in histories:
                 agent_id = history.get("agent_id")
                 cost_breakdown = history.get("cost_breakdown")
+                # Apply margin to each credit before saving into DB
+                if cost_breakdown:
+                    def _apply_margin_item(item):
+                        try:
+                            credit = float(item.get("credit") or 0)
+                        except Exception:
+                            credit = 0.0
+                        new_item = dict(item)
+                        new_item["credit"] = credit * (1 + margin_rate)
+                        return new_item
+                    cost_breakdown = [_apply_margin_item(item) for item in cost_breakdown]
                 call_log = CallLog(
                     agent_id = history.get("agent_id") or None,
                     agent_config = history.get("agent_config") or None,
@@ -79,6 +96,7 @@ async def save_histories(histories: list):
                     continue
                 cost = 0
                 if cost_breakdown:
+                    # cost_breakdown already has margin applied above
                     cost = sum((item.get("credit") or 0) for item in cost_breakdown)
                 db_user.used_credit = (db_user.used_credit or 0) + cost
             try:
