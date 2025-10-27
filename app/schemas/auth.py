@@ -31,3 +31,4 @@ class UserUpdate(schemas.BaseUserUpdate):
     auto_refill_amount: Optional[float] = 0
     auto_threshold: Optional[float] = 0
     avatar: Optional[str] = None
+    is_active: Optional[bool] = None
