@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import BearerTransport, JWTStrategy, AuthenticationBackend
 from fastapi_users.jwt import generate_jwt
@@ -9,6 +9,7 @@ import httpx
 from app.core.config import settings
 from app.utils.auth import get_user_manager
 from app.models import User
+from fastapi_users import exceptions as fau_exceptions
 from app.schemas.auth import UserCreate, UserRead, UserUpdate
 
 bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
@@ -71,12 +72,15 @@ async def google_callback(code: str, state: str, user_manager=Depends(get_user_m
         )
         profile = resp.json()
 
-    user = await user_manager.oauth_callback(
-        oauth_name="google",
-        access_token=token_data["access_token"],
-        account_id=profile["id"],
-        account_email=profile["email"]
-    )
+    try:
+        user = await user_manager.oauth_callback(
+            oauth_name="google",
+            access_token=token_data["access_token"],
+            account_id=profile["id"],
+            account_email=profile["email"]
+        )
+    except fau_exceptions.UserAlreadyExists:
+        raise HTTPException(status_code=409, detail="User already exists for this email; account not linked.")
     await user_manager.update(
         user_update=UserUpdate(
             first_name=profile.get("given_name"),
