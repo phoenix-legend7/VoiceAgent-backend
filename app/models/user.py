@@ -1,5 +1,5 @@
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlalchemy import Float, String, ForeignKey, Boolean
+from sqlalchemy import Float, String, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional
 import uuid
@@ -30,6 +30,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     auto_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0)
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     default_payment_method: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    api_keys: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship(
         "OAuthAccount", cascade="all, delete-orphan", lazy="joined"
     )

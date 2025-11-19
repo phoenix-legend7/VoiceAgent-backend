@@ -1,5 +1,5 @@
 from fastapi_users import schemas
-from typing import Optional
+from typing import Optional, Dict
 import uuid
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
@@ -11,6 +11,7 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
     auto_refill_amount: Optional[float] = 0
     auto_threshold: Optional[float] = 0
     avatar: Optional[str] = None
+    api_keys: Optional[Dict[str, str]] = None
 
 class UserCreate(schemas.BaseUserCreate):
     first_name: Optional[str] = None
@@ -32,3 +33,4 @@ class UserUpdate(schemas.BaseUserUpdate):
     auto_threshold: Optional[float] = 0
     avatar: Optional[str] = None
     is_active: Optional[bool] = None
+    api_keys: Optional[Dict[str, str]] = None
