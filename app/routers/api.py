@@ -17,6 +17,7 @@ from app.routers import (
     user,
     stripe,
     tool,
+    automation,
 )
 
 api_router = APIRouter(prefix=settings.API_V1_STR)
@@ -37,3 +38,4 @@ api_router.include_router(campaign_schedule.router, prefix="/campaign-schedule",
 api_router.include_router(user.router, prefix="/user", tags=["user"])
 api_router.include_router(stripe.router, prefix="/billing", tags=["billing"])
 api_router.include_router(tool.router, prefix="/tools", tags=["tools"])
+api_router.include_router(automation.router, prefix="/automation", tags=["automation"])
