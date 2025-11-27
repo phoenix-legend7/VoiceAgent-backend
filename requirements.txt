@@ -16,3 +16,4 @@ nest-asyncio==1.6.0
 fastapi-users==14.0.1
 stripe==12.4.0
 fastapi-users[sqlalchemy,oauth]
+cryptography==43.0.3

@@ -9,3 +9,4 @@ from .user import User, OAuthAccount
 from .phone import Phone
 from .tool import Tools
 from .automation import AutomationWebhook
+from .calendar import Calendar

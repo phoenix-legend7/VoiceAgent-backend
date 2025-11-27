@@ -2,13 +2,15 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 import json, httpx, re
 
 from app.core.database import get_db
-from app.models import Agent, Tools
+from app.models import Agent, Tools, Calendar
 from app.routers.auth import current_active_user
 from app.schemas import AgentCreate, AgentUpdate
 from app.utils.httpx import get_httpx_headers, httpx_base_url
+from app.utils.encryption import decrypt_value
 
 
 class AgentToolRequest(BaseModel):
@@ -114,7 +116,56 @@ async def update_agent(agent_id: str, agent: AgentUpdate, db: AsyncSession = Dep
     async with httpx.AsyncClient() as client:
         try:
             headers = get_httpx_headers()
-            response = await client.put(f"{httpx_base_url}/agents/{agent_id}", data=json.dumps(agent.model_dump()), headers=headers)
+            agent_data = agent.model_dump()
+
+            if "config" in agent_data and isinstance(agent_data["config"], dict):
+                config = agent_data["config"]
+                calendar_ids = config.get("calendar_ids", [])
+                
+                if calendar_ids:
+                    calendar_ids_list = calendar_ids if isinstance(calendar_ids, list) else [calendar_ids]
+                    calendar_uuid_list = []
+                    for cal_id in calendar_ids_list:
+                        try:
+                            if isinstance(cal_id, str):
+                                calendar_uuid_list.append(UUID(cal_id))
+                            else:
+                                calendar_uuid_list.append(cal_id)
+                        except:
+                            continue
+                    
+                    if calendar_uuid_list:
+                        calendars_result = await db.execute(
+                            select(Calendar).where(
+                                Calendar.id.in_(calendar_uuid_list),
+                                Calendar.user_id == user.id
+                            )
+                        )
+                        calendars = calendars_result.scalars().all()
+                        app_functions = config.get("app_functions", [])
+                        calendar_names = [cal.name for cal in calendars]
+                        app_functions = [f for f in app_functions if f.get("name") not in calendar_names]
+                        
+                        for calendar in calendars:
+                            function_config = {
+                                "name": calendar.name,
+                                "credentials": {
+                                    "api_key": decrypt_value(calendar.api_key),
+                                    "event_type_id": calendar.event_type_id,
+                                }
+                            }
+                            if calendar.contact_method:
+                                function_config["credentials"]["contact_method"] = calendar.contact_method
+                            app_functions.append(function_config)
+                        
+                        config["app_functions"] = app_functions
+                else:
+                    config["app_functions"] = []
+                
+                config_for_millisai = {k: v for k, v in config.items() if k != "calendar_ids"}
+                agent_data["config"] = config_for_millisai
+
+            response = await client.put(f"{httpx_base_url}/agents/{agent_id}", data=json.dumps(agent_data), headers=headers)
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             db_agent.config = {**db_agent.config, **agent.config}
