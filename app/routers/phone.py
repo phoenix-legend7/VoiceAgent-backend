@@ -259,7 +259,16 @@ async def import_phone_number(
     try:
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
-            response = await client.post(f"{httpx_base_url}/phones/import", json=request.model_dump(), headers=headers)
+            payload = {
+                "country": request.country,
+                "phone": request.phone,
+                "provider": request.provider,
+                "region": request.region,
+                "api_key": request.api_key,
+                "api_secret": request.api_secret,
+                "account_sid": request.account_sid,
+            }
+            response = await client.post(f"{httpx_base_url}/phones/import", json=payload, headers=headers)
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             db_phone = Phone(
