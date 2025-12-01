@@ -93,7 +93,7 @@ async def get_phone(phone_id: str):
     try:
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
-            response = await client.get(f"{httpx_base_url}/phone/{phone_id}", headers=headers)
+            response = await client.get(f"{httpx_base_url}/phones/{phone_id}", headers=headers)
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             return response.json()
@@ -144,7 +144,7 @@ async def delete_phone(
             raise HTTPException(status_code=404, detail=f"Not found phone {phone_id}")
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
-            response = await client.delete(f"{httpx_base_url}/phone/{phone_id}", headers=headers)
+            response = await client.delete(f"{httpx_base_url}/phones/{phone_id}", headers=headers)
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             try:
@@ -153,7 +153,7 @@ async def delete_phone(
                 await db.refresh(db_phone)
             except Exception as e:
                 print(f"Error while setting agent config: {str(e)}")
-            return response.json()
+            return {"detail": "Phone deleted successfully"}
 
     except HTTPException:
         raise
@@ -174,7 +174,7 @@ async def set_phone_tag(
             raise HTTPException(status_code=404, detail=f"Not found phone {phone_id}")
         async with httpx.AsyncClient() as client:
             headers = get_httpx_headers()
-            response = await client.put(f"{httpx_base_url}/phone/{phone_id}", json=request.model_dump(), headers=headers)
+            response = await client.put(f"{httpx_base_url}/phones/{phone_id}", json=request.model_dump(), headers=headers)
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
             db_phone.tags = request.tags
@@ -183,7 +183,7 @@ async def set_phone_tag(
                 await db.refresh(db_phone)
             except Exception as e:
                 print(f"Error while setting agent config: {str(e)}")
-            return response.json()
+            return response.text
 
     except HTTPException:
         raise
@@ -264,10 +264,21 @@ async def import_phone_number(
                 "phone": request.phone,
                 "provider": request.provider,
                 "region": request.region,
-                "api_key": request.api_key,
-                "api_secret": request.api_secret,
-                "account_sid": request.account_sid,
             }
+            if request.subdomain:
+                payload["subdomain"] = request.subdomain
+            if request.auth_id:
+                payload["auth_id"] = request.auth_id
+            if request.auth_token:
+                payload["auth_token"] = request.auth_token
+            if request.api_key:
+                payload["api_key"] = request.api_key
+            if request.api_secret:
+                payload["api_secret"] = request.api_secret
+            if request.account_sid:
+                payload["account_sid"] = request.account_sid
+            if request.app_id:
+                payload["app_id"] = request.app_id
             response = await client.post(f"{httpx_base_url}/phones/import", json=payload, headers=headers)
             if response.status_code != 200 and response.status_code != 201:
                 raise HTTPException(status_code=response.status_code, detail=response.text or "Unknown Error")
