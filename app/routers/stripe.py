@@ -188,6 +188,63 @@ async def manual_topup(
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/payment-methods/{payment_method_id}/default")
+async def set_default_payment_method(
+    payment_method_id: str,
+    user: User = Depends(current_active_user),
+):
+    """Set the default payment method for the current user"""
+    try:
+        if not user.stripe_customer_id:
+            raise HTTPException(
+                status_code=404,
+                detail="No Stripe customer found",
+            )
+
+        payment_methods = stripe.PaymentMethod.list(
+            customer=user.stripe_customer_id,
+            type="card",
+        )
+
+        target_pm = None
+        for pm in payment_methods.data:
+            if pm.id == payment_method_id:
+                target_pm = pm
+                break
+
+        if not target_pm:
+            raise HTTPException(
+                status_code=404,
+                detail="Payment method not found or doesn't belong to this user",
+            )
+
+        stripe.Customer.modify(
+            user.stripe_customer_id,
+            invoice_settings={"default_payment_method": payment_method_id},
+        )
+
+        user.default_payment_method = payment_method_id
+        await save_user(user)
+
+        return {
+            "success": True,
+            "default_payment_method": {
+                "id": target_pm.id,
+                "type": target_pm.type,
+                "card": {
+                    "brand": target_pm.card.brand,
+                    "last4": target_pm.card.last4,
+                    "exp_month": target_pm.card.exp_month,
+                    "exp_year": target_pm.card.exp_year,
+                },
+            },
+        }
+
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/payment-methods/{payment_method_id}")
 async def delete_payment_method(
     payment_method_id: str,
