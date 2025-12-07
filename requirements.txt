@@ -17,3 +17,6 @@ fastapi-users==14.0.1
 stripe==12.4.0
 fastapi-users[sqlalchemy,oauth]
 cryptography==43.0.3
+beautifulsoup4==4.12.3
+lxml==5.3.0
+html5lib==1.1
