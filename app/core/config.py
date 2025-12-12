@@ -7,7 +7,7 @@ load_dotenv()
 
 class Settings(BaseModel):
     """Application settings."""
-    APP_NAME: str = "Elysia Partners API"
+    APP_NAME: str = "Elysia Partners"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
     DATABASE_URL: str = os.getenv("DATABASE_URL", "your-database-url-here")
