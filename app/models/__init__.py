@@ -10,3 +10,4 @@ from .phone import Phone
 from .tool import Tools
 from .automation import AutomationWebhook
 from .calendar import Calendar
+from .verification_code import VerificationCode

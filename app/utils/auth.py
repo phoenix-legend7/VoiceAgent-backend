@@ -1,13 +1,17 @@
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, UUIDIDMixin
 from fastapi_users.db import SQLAlchemyUserDatabase
-from sqlalchemy import select
+from fastapi_users.jwt import generate_jwt
+from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 from typing import Optional
+from datetime import datetime, timedelta
 import uuid
+import random
 from app.core.config import settings
-from app.models import User, OAuthAccount
+from app.models import User, OAuthAccount, VerificationCode
 from app.core.database import get_db
+from app.utils.email import email_service
 
 class UserDatabase(SQLAlchemyUserDatabase[User, OAuthAccount]):
     async def get_by_oauth_account(self, oauth: str, account_id: str) -> Optional[User]:
@@ -27,8 +31,34 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = settings.JWT_SECRET_KEY
     verification_token_secret = settings.JWT_SECRET_KEY
 
-    async def on_after_register(self, user: User, request=None):
+    async def on_after_register(self, user: User, request: Optional[Request] = None):
+        """Send verification email with code after user registration."""
         print(f"User {user.id} has registered.")
+        
+        # Generate 6-digit verification code
+        verification_code = f"{random.randint(100000, 999999)}"
+        
+        # Store verification code in database using the user_db session
+        expires_at = datetime.utcnow() + timedelta(hours=24)
+        db_code = VerificationCode(
+            user_id=user.id,
+            email=user.email,
+            code=verification_code,
+            expires_at=expires_at,
+            used=False
+        )
+        self.user_db.session.add(db_code)
+        await self.user_db.session.commit()
+        
+        # Send verification email with code
+        await email_service.send_verification_email(
+            to_email=user.email,
+            verification_code=verification_code
+        )
+    
+    async def on_after_verify(self, user: User, request: Optional[Request] = None):
+        """Called after user email is verified."""
+        print(f"User {user.id} has verified their email.")
 
 async def get_user_db(session = Depends(get_db)):
     # Use custom UserDatabase (with optimized get_by_oauth_account)
