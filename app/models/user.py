@@ -1,7 +1,8 @@
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlalchemy import Float, String, ForeignKey, Boolean, JSON
+from sqlalchemy import Float, String, ForeignKey, Boolean, JSON, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional
+from datetime import datetime
 import uuid
 from app.core.database import Base
 
@@ -31,6 +32,8 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     default_payment_method: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     api_keys: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    reset_password_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    reset_password_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     oauth_accounts: Mapped[List[OAuthAccount]] = relationship(
         "OAuthAccount", cascade="all, delete-orphan", lazy="joined"
     )

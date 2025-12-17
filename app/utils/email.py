@@ -136,6 +136,83 @@ class EmailService:
             text_content=text_content
         )
 
+    async def send_password_reset_email(
+        self,
+        to_email: str,
+        reset_token: str
+    ) -> bool:
+        """
+        Send password reset email with a reset token.
+        
+        Args:
+            to_email: Recipient email address
+            reset_token: Password reset token
+            
+        Returns:
+            True if email sent successfully, False otherwise
+        """
+        app_name = settings.APP_NAME
+        # Construct the reset URL - this will be the frontend URL
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Reset Your Password</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h1 style="color: white; margin: 0;">Reset Your Password</h1>
+            </div>
+            <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0;">
+                <p style="font-size: 16px; margin-bottom: 20px;">Hello,</p>
+                <p style="font-size: 16px; margin-bottom: 20px;">
+                    We received a request to reset your password for your {app_name} account. Click the button below to reset your password:
+                </p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{reset_url}" style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                        Reset Password
+                    </a>
+                </div>
+                <p style="font-size: 14px; color: #666; margin-top: 20px;">
+                    Or copy and paste this link into your browser:
+                </p>
+                <p style="font-size: 12px; color: #667eea; word-break: break-all; background: white; padding: 10px; border-radius: 5px; border: 1px solid #e0e0e0;">
+                    {reset_url}
+                </p>
+                <p style="font-size: 14px; color: #666; margin-top: 20px;">
+                    This link will expire in 1 hour. If you didn't request a password reset, please ignore this email or contact support if you have concerns.
+                </p>
+            </div>
+            <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #999; font-size: 12px;">
+                <p>© {app_name}. All rights reserved.</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        text_content = f"""
+        Reset Your Password
+        
+        Hello,
+        
+        We received a request to reset your password for your {app_name} account. Click the link below to reset your password:
+        
+        {reset_url}
+        
+        This link will expire in 1 hour. If you didn't request a password reset, please ignore this email or contact support if you have concerns.
+        """
+
+        return await self.send_email(
+            to_email=to_email,
+            subject=f"Reset Your {app_name} Password",
+            html_content=html_content,
+            text_content=text_content
+        )
+
 # Global email service instance
 email_service = EmailService()
 

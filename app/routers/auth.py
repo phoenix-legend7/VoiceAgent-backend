@@ -6,10 +6,11 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 import httpx
 import random
+import secrets
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -247,3 +248,102 @@ async def resend_verification_email(
     except Exception as e:
         # Don't reveal errors for security
         return {"message": "If an account exists with this email, a verification email has been sent."}
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    user_manager=Depends(get_user_manager)
+):
+    """Request a password reset email."""
+    from app.utils.email import email_service
+    from app.models import User
+    
+    try:
+        # Find user by email
+        user_stmt = select(User).where(User.email == request.email)
+        result = await db.execute(user_stmt)
+        user = result.unique().scalar_one_or_none()
+        
+        # Always return success message for security (don't reveal if user exists)
+        if not user:
+            return {"message": "If an account exists with this email, a password reset link has been sent."}
+
+        # Only allow password reset for email/password accounts (not OAuth-only)
+        if (not user.hashed_password) or (user.oauth_accounts and len(user.oauth_accounts) > 0):
+            return {"message": "If an account exists with this email, a password reset link has been sent."}
+        
+        # Generate secure random token
+        reset_token = secrets.token_urlsafe(32)
+        
+        # Set token and expiry (1 hour from now)
+        user.reset_password_token = reset_token
+        user.reset_password_token_expires = datetime.utcnow() + timedelta(hours=1)
+        
+        await db.commit()
+        
+        # Send password reset email
+        await email_service.send_password_reset_email(
+            to_email=user.email,
+            reset_token=reset_token
+        )
+        
+        return {"message": "If an account exists with this email, a password reset link has been sent."}
+    except Exception as e:
+        import logging
+        logging.error(f"Error in forgot password: {str(e)}")
+        # Don't reveal errors for security
+        return {"message": "If an account exists with this email, a password reset link has been sent."}
+
+@router.post("/reset-password")
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    user_manager=Depends(get_user_manager)
+):
+    """Reset password using the token from email."""
+    from app.models import User
+    from fastapi_users.password import PasswordHelper
+    
+    try:
+        # Find user with valid reset token
+        user_stmt = select(User).where(
+            User.reset_password_token == request.token,
+            User.reset_password_token_expires > datetime.utcnow()
+        )
+        result = await db.execute(user_stmt)
+        user = result.unique().scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+
+        # Block reset for OAuth-only accounts even if a token exists
+        if (not user.hashed_password) or (user.oauth_accounts and len(user.oauth_accounts) > 0):
+            raise HTTPException(status_code=400, detail="Password reset is only available for email sign-up accounts.")
+        
+        # Hash the new password
+        password_helper = PasswordHelper()
+        hashed_password = password_helper.hash(request.new_password)
+        
+        # Update user password and clear reset token
+        user.hashed_password = hashed_password
+        user.reset_password_token = None
+        user.reset_password_token_expires = None
+        
+        await db.commit()
+        
+        return {"message": "Password reset successfully."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        import logging
+        logging.error(f"Error resetting password: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset password: {str(e)}")
