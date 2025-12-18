@@ -62,7 +62,7 @@ async def monitor_agent_credit():
             # Get all users
             stmt = select(User)
             result = await session.execute(stmt)
-            users = result.scalars().all()
+            users = result.unique().scalars().all()
             
             processed_count = 0
             stopped_count = 0

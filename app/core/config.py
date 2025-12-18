@@ -30,5 +30,8 @@ class Settings(BaseModel):
     
     # Frontend URL for email verification links
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://spark.elysiapartners.com")
+    
+    # OpenAI Configuration
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
 settings = Settings()

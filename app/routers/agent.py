@@ -11,6 +11,7 @@ from app.routers.auth import current_active_user
 from app.schemas import AgentCreate, AgentUpdate
 from app.utils.httpx import get_httpx_headers, httpx_base_url
 from app.utils.encryption import decrypt_value
+from app.services.prompt_generator import generate_prompt_with_openai
 
 
 class AgentToolRequest(BaseModel):
@@ -21,6 +22,15 @@ class AgentToolRequest(BaseModel):
     response_mode: str | None = None
     execute_after_message: bool | None = None
     exclude_session_id: bool | None = None
+
+
+class PromptGenerationRequest(BaseModel):
+    agent_name: str
+    industry: str
+    description: str | None = None
+    purpose: str | None = None
+    personality: str | None = None
+    industry_prompt: str | None = None
 
 
 router = APIRouter()
@@ -347,3 +357,34 @@ async def set_embed_config(agent_id: str, embed_config: dict, db: AsyncSession =
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generate-prompt")
+async def generate_agent_prompt(
+    request: PromptGenerationRequest,
+    user = Depends(current_active_user)
+):
+    """
+    Generate an AI agent prompt using OpenAI based on agent specifications.
+    
+    Args:
+        request: PromptGenerationRequest containing agent details
+
+    Returns:
+        Generated prompt string
+    """
+    try:
+        prompt = await generate_prompt_with_openai(
+            agent_name=request.agent_name,
+            industry=request.industry,
+            description=request.description,
+            purpose=request.purpose,
+            personality=request.personality,
+            industry_prompt=request.industry_prompt,
+        )
+        return {
+            "prompt": prompt,
+            "status": "success"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate prompt: {str(e)}")
+
