@@ -65,7 +65,10 @@ async def get_dashboard_data(
     user = Depends(current_active_user)
 ):
     try:
-        agents: list = await get_agents()
+        # Query agents for the current user
+        agents_result = await db.execute(select(Agent).where(Agent.user_id == user.id))
+        agents = [{"id": agent.id, "name": agent.name} for agent in agents_result.scalars().all()]
+        
         query = (
             select(CallLog)
             .join(Agent, CallLog.agent_id == Agent.id)  # join so we can filter by user
@@ -147,4 +150,7 @@ async def get_dashboard_data(
     except HTTPException:
         raise
     except Exception as e:
+        print("----------------------")
+        print(e)
+        print("----------------------")
         raise HTTPException(status_code=500, detail=str(e))
