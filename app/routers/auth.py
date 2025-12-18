@@ -70,6 +70,27 @@ router.include_router(
     tags=["auth"],
 )
 
+@router.get("/google/authorize")
+async def google_authorize():
+    """Generate Google OAuth authorization URL with account selection prompt."""
+    from fastapi_users.router.oauth import generate_state_token
+    
+    # Generate state token for security
+    state_token = generate_state_token(
+        data={},
+        secret=settings.JWT_SECRET_KEY
+    )
+    
+    # Get authorization URL with prompt parameter to force account selection
+    authorization_url = await google_client.get_authorization_url(
+        redirect_uri=settings.GOOGLE_REDIRECT_CALLBACK,
+        state=state_token,
+        scope=["openid", "email", "profile"],
+        extras_params={"prompt": "select_account"}  # Force account selection
+    )
+    
+    return {"authorization_url": authorization_url}
+
 @router.get("/google/verify")
 async def google_callback(code: str, state: str, user_manager=Depends(get_user_manager)):
     token_data = await google_client.get_access_token(code, settings.GOOGLE_REDIRECT_CALLBACK)
