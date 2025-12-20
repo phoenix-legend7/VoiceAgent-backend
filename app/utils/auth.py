@@ -2,6 +2,7 @@ from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, UUIDIDMixin
 from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.jwt import generate_jwt
+from fastapi_users import exceptions
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 from typing import Optional
@@ -30,6 +31,31 @@ class UserDatabase(SQLAlchemyUserDatabase[User, OAuthAccount]):
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = settings.JWT_SECRET_KEY
     verification_token_secret = settings.JWT_SECRET_KEY
+
+    async def authenticate(self, credentials):
+        """Override authenticate to check if user is active."""
+        try:
+            user = await self.get_by_email(credentials.username)
+        except exceptions.UserNotExists:
+            # Run the hasher to mitigate timing attack
+            self.password_helper.hash(credentials.password)
+            return None
+
+        verified, updated_password_hash = self.password_helper.verify_and_update(
+            credentials.password, user.hashed_password
+        )
+        if not verified:
+            return None
+        
+        # Check if user is active
+        if not user.is_active:
+            raise exceptions.UserInactive()
+
+        # Update password hash to a more robust one if needed
+        if updated_password_hash is not None:
+            await self.user_db.update(user, {"hashed_password": updated_password_hash})
+
+        return user
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
         """Send verification email with code after user registration."""

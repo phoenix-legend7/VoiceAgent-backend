@@ -1,7 +1,9 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi_users import exceptions as fau_exceptions
 import asyncio
 import nest_asyncio
 
@@ -75,6 +77,14 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan
 )
+
+# Add exception handler for inactive users
+@app.exception_handler(fau_exceptions.UserInactive)
+async def user_inactive_exception_handler(request: Request, exc: fau_exceptions.UserInactive):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Your account has been blocked by the administrator. Please contact support for assistance."}
+    )
 
 # Configure CORS
 app.add_middleware(
