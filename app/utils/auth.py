@@ -111,12 +111,25 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             )
 
             # Persist subscription details on the user
+            # During trial, use trial_start/trial_end; otherwise use current_period_start/end
+            start_date = None
+            end_date = None
+
+            if subscription.trial_end:
+                # Subscription is in trial
+                start_date = datetime.fromtimestamp(subscription.trial_start) if subscription.trial_start else None
+                end_date = datetime.fromtimestamp(subscription.trial_end)
+            elif subscription.current_period_start:
+                # Subscription is active (no trial or trial ended)
+                start_date = datetime.fromtimestamp(subscription.current_period_start)
+                end_date = datetime.fromtimestamp(subscription.current_period_end)
+
             updates = {
                 "stripe_subscription_id": subscription.id,
                 "subscription_status": subscription.status,
                 "subscription_plan": price_id,
-                "subscription_start_date": datetime.fromtimestamp(subscription.current_period_start),
-                "subscription_end_date": datetime.fromtimestamp(subscription.current_period_end),
+                "subscription_start_date": start_date,
+                "subscription_end_date": end_date,
             }
             await self.user_db.update(user, updates)
             logging.info(f"Created trial subscription for user {user.id}: {subscription.id}")
