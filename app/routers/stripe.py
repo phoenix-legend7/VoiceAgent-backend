@@ -36,6 +36,16 @@ class WebhookData(BaseModel):
 class ManualTopupRequest(BaseModel):
     amount: float
 
+class SubscriptionRequest(BaseModel):
+    price_id: str  # Stripe price ID for the subscription plan
+
+class SubscriptionPlanResponse(BaseModel):
+    id: str
+    name: str
+    price: float
+    interval: str  # monthly, yearly
+    features: list
+
 def cents_to_dollars(cents: int) -> float:
     return cents / 100
 
@@ -403,3 +413,256 @@ async def log_auto_refill(user_id: str, amount: float):
     except Exception:
         # Avoid raising from logging issues
         pass
+
+# Subscription Management Endpoints
+@router.get("/subscription/plans")
+async def get_subscription_plans():
+    """Return the single available subscription plan with live price details from Stripe."""
+    try:
+        price_id = os.getenv("STRIPE_SINGLE_PLAN_PRICE_ID")
+        # Retrieve price from Stripe to get currency and unit amount
+        price = stripe.Price.retrieve(price_id)
+        unit_amount = price.get("unit_amount") or 0
+        currency = price.get("currency", "aud")
+        recurring = price.get("recurring", {})
+        interval = recurring.get("interval", "month")
+
+        plan = {
+            "id": price_id,
+            "name": "Millis AI Monthly",
+            "price": unit_amount / 100.0,
+            "currency": currency,
+            "interval": "monthly" if interval == "month" else interval,
+            "features": [
+                "Includes 3-day free trial",
+                "Credit-based usage (requires credits)",
+                "Agent access while subscription active",
+                "Cancel anytime"
+            ]
+        }
+        return {"plans": [plan]}
+    except stripe.error.StripeError as e:
+        # Fall back to static data if Stripe is unavailable
+        logging.error(f"Failed to retrieve Stripe price {e}")
+        return {
+            "plans": [{
+                "id": os.getenv("STRIPE_SINGLE_PLAN_PRICE_ID"),
+                "name": "Millis AI Monthly",
+                "price": 499,
+                "currency": "aud",
+                "interval": "monthly",
+                "features": [
+                    "Includes 3-day free trial",
+                    "Credit-based usage (requires credits)",
+                    "Agent access while subscription active",
+                    "Cancel anytime"
+                ]
+            }]
+        }
+
+@router.post("/subscription/create")
+async def create_subscription(
+    request: SubscriptionRequest,
+    user: User = Depends(current_active_user)
+):
+    """Create a new subscription for the user"""
+    try:
+        # Create or retrieve Stripe customer
+        if not user.stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=user.email,
+                metadata={'user_id': user.id}
+            )
+            user.stripe_customer_id = customer.id
+            await save_user(user)
+        
+        # Ensure user has a payment method
+        if not user.default_payment_method:
+            raise HTTPException(
+                status_code=400,
+                detail="Please add a payment method before subscribing"
+            )
+        
+        # Create the subscription
+        subscription = stripe.Subscription.create(
+            customer=user.stripe_customer_id,
+            items=[{"price": request.price_id}],
+            default_payment_method=user.default_payment_method,
+            metadata={
+                'user_id': str(user.id)
+            }
+        )
+        
+        # Update user subscription info
+        from datetime import datetime
+        user.stripe_subscription_id = subscription.id
+        user.subscription_status = subscription.status
+        user.subscription_plan = request.price_id
+        user.subscription_start_date = datetime.fromtimestamp(subscription.current_period_start)
+        user.subscription_end_date = datetime.fromtimestamp(subscription.current_period_end)
+        
+        await save_user(user)
+        
+        return {
+            "success": True,
+            "subscription": {
+                "id": subscription.id,
+                "status": subscription.status,
+                "current_period_start": subscription.current_period_start,
+                "current_period_end": subscription.current_period_end
+            }
+        }
+    
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"Error creating subscription: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/subscription/current")
+async def get_current_subscription(user: User = Depends(current_active_user)):
+    """Get the user's current subscription details"""
+    try:
+        if not user.stripe_subscription_id:
+            return {
+                "has_subscription": False,
+                "subscription": None
+            }
+        
+        # Fetch latest subscription info from Stripe
+        subscription = stripe.Subscription.retrieve(user.stripe_subscription_id)
+        
+        # Update local database with latest info
+        from datetime import datetime
+        user.subscription_status = subscription.status
+        user.subscription_start_date = datetime.fromtimestamp(subscription.current_period_start)
+        user.subscription_end_date = datetime.fromtimestamp(subscription.current_period_end)
+        await save_user(user)
+        
+        return {
+            "has_subscription": True,
+            "subscription": {
+                "id": subscription.id,
+                "status": subscription.status,
+                "plan": user.subscription_plan,
+                "current_period_start": subscription.current_period_start,
+                "current_period_end": subscription.current_period_end,
+                "cancel_at_period_end": subscription.cancel_at_period_end
+            }
+        }
+    
+    except stripe.error.StripeError as e:
+        logging.error(f"Error fetching subscription: {str(e)}")
+        return {
+            "has_subscription": False,
+            "subscription": None
+        }
+
+@router.post("/subscription/cancel")
+async def cancel_subscription(user: User = Depends(current_active_user)):
+    """Cancel the user's subscription (at period end)"""
+    try:
+        if not user.stripe_subscription_id:
+            raise HTTPException(
+                status_code=400,
+                detail="No active subscription found"
+            )
+        
+        # Cancel at period end (user keeps access until end of billing period)
+        subscription = stripe.Subscription.modify(
+            user.stripe_subscription_id,
+            cancel_at_period_end=True
+        )
+        
+        # Update status
+        user.subscription_status = "canceling"
+        await save_user(user)
+        
+        return {
+            "success": True,
+            "message": "Subscription will be canceled at the end of the current billing period",
+            "ends_at": subscription.current_period_end
+        }
+    
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/subscription/reactivate")
+async def reactivate_subscription(user: User = Depends(current_active_user)):
+    """Reactivate a subscription that was set to cancel"""
+    try:
+        if not user.stripe_subscription_id:
+            raise HTTPException(
+                status_code=400,
+                detail="No subscription found"
+            )
+        
+        # Remove the cancel_at_period_end flag
+        subscription = stripe.Subscription.modify(
+            user.stripe_subscription_id,
+            cancel_at_period_end=False
+        )
+        
+        # Update status
+        user.subscription_status = subscription.status
+        await save_user(user)
+        
+        return {
+            "success": True,
+            "message": "Subscription reactivated successfully",
+            "subscription": {
+                "id": subscription.id,
+                "status": subscription.status
+            }
+        }
+    
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/subscription/webhook")
+async def handle_subscription_webhook(webhook_data: WebhookData):
+    """Handle Stripe webhook events for subscription updates"""
+    try:
+        event_type = webhook_data.type
+        data = webhook_data.data
+        
+        # Handle subscription events
+        if event_type == "customer.subscription.updated":
+            subscription = data.get("object", {})
+            customer_id = subscription.get("customer")
+            
+            # Find user by stripe_customer_id
+            async with get_db_background() as session:
+                stmt = select(User).where(User.stripe_customer_id == customer_id)
+                result = await session.execute(stmt)
+                user = result.scalar_one_or_none()
+                
+                if user:
+                    from datetime import datetime
+                    user.subscription_status = subscription.get("status")
+                    user.subscription_start_date = datetime.fromtimestamp(subscription.get("current_period_start"))
+                    user.subscription_end_date = datetime.fromtimestamp(subscription.get("current_period_end"))
+                    await session.commit()
+                    logging.info(f"Updated subscription status for user {user.id}: {user.subscription_status}")
+        
+        elif event_type == "customer.subscription.deleted":
+            subscription = data.get("object", {})
+            customer_id = subscription.get("customer")
+            
+            async with get_db_background() as session:
+                stmt = select(User).where(User.stripe_customer_id == customer_id)
+                result = await session.execute(stmt)
+                user = result.scalar_one_or_none()
+                
+                if user:
+                    user.subscription_status = "canceled"
+                    user.stripe_subscription_id = None
+                    await session.commit()
+                    logging.info(f"Canceled subscription for user {user.id}")
+        
+        return {"success": True}
+    
+    except Exception as e:
+        logging.error(f"Error handling subscription webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+

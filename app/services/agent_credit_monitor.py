@@ -54,8 +54,11 @@ async def set_agent_status(agent_id: str, status: str) -> bool:
 async def monitor_agent_credit():
     """
     Background task to monitor all users' credit and manage their agents.
-    - Stops agents when credit is 0 or below
-    - Starts agents when credit is available again (if they were stopped due to credit)
+    - Stops agents when:
+      1. No active subscription AND credit is 0 or below, OR
+      2. Active subscription exists BUT credit is 0 or below
+    - Starts agents when:
+      1. Active subscription exists AND credit is available
     """
     try:
         async with get_db_background() as session:
@@ -73,6 +76,12 @@ async def monitor_agent_credit():
                     total_credit = user.total_credit or 0
                     used_credit = user.used_credit or 0
                     available_credit = total_credit - used_credit
+                    
+                    # Check if user has an active subscription
+                    has_active_subscription = (
+                        user.subscription_status in ["active", "trialing"] and
+                        user.stripe_subscription_id is not None
+                    )
 
                     agent_stmt = select(Agent).where(Agent.user_id == user.id)
                     agent_result = await session.execute(agent_stmt)
@@ -80,18 +89,29 @@ async def monitor_agent_credit():
                     
                     for agent in agents:
                         try:
-                            if available_credit <= 0 and not agent.stopped_due_to_credit:
+                            # Agent should be stopped if:
+                            # 1. No active subscription AND no credit, OR
+                            # 2. Has subscription BUT no credit (subscription alone is not enough)
+                            should_stop = available_credit <= 0
+                            
+                            # Agent can run only if:
+                            # 1. Has active subscription AND has credit
+                            can_run = has_active_subscription and available_credit > 0
+                            
+                            if should_stop and not agent.stopped_due_to_credit:
                                 success = await set_agent_status(agent.id, "disabled")
                                 if success:
                                     agent.stopped_due_to_credit = True
                                     stopped_count += 1
-                                    logger.info(f"Stopped agent {agent.id} for user {user.id} due to zero credit")
-                            elif available_credit > 0 and agent.stopped_due_to_credit:
+                                    reason = "no subscription and no credit" if not has_active_subscription else "no credit (subscription active)"
+                                    logger.info(f"Stopped agent {agent.id} for user {user.id} due to: {reason}")
+                            
+                            elif can_run and agent.stopped_due_to_credit:
                                 success = await set_agent_status(agent.id, "active")
                                 if success:
                                     agent.stopped_due_to_credit = False
                                     started_count += 1
-                                    logger.info(f"Started agent {agent.id} for user {user.id} - credit available")
+                                    logger.info(f"Started agent {agent.id} for user {user.id} - subscription active and credit available")
 
                             await session.commit()
                             processed_count += 1

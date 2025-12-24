@@ -31,6 +31,12 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     auto_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0)
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     default_payment_method: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # Subscription fields
+    subscription_status: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # active, inactive, canceled, past_due
+    subscription_plan: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # starter, professional, enterprise, etc.
+    subscription_start_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    subscription_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     api_keys: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     reset_password_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     reset_password_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

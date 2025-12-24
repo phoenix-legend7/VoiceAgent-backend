@@ -1,14 +1,16 @@
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, UUIDIDMixin
 from fastapi_users.db import SQLAlchemyUserDatabase
-from fastapi_users.jwt import generate_jwt
 from fastapi_users import exceptions
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import Optional
 from datetime import datetime, timedelta
 import uuid
 import random
+import os
+import logging
+import stripe
 from app.core.config import settings
 from app.models import User, OAuthAccount, VerificationCode
 from app.core.database import get_db
@@ -81,6 +83,47 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             to_email=user.email,
             verification_code=verification_code
         )
+
+        # Create Stripe customer and start 3-day trial subscription automatically on signup
+        try:
+            stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+            if not stripe.api_key:
+                logging.warning("STRIPE_SECRET_KEY not set; skipping trial subscription creation")
+                return
+
+            # Ensure Stripe customer exists
+            if not getattr(user, "stripe_customer_id", None):
+                customer = stripe.Customer.create(
+                    email=user.email,
+                    metadata={"user_id": str(user.id)}
+                )
+                user = await self.user_db.update(user, {"stripe_customer_id": customer.id})
+
+            # Create subscription with 3-day trial for the single plan
+            price_id = os.getenv("STRIPE_SINGLE_PLAN_PRICE_ID", "price_1SUfE3H5cS5BXfZcy9EEE8Rq")
+
+            subscription = stripe.Subscription.create(
+                customer=user.stripe_customer_id,
+                items=[{"price": price_id}],
+                trial_period_days=3,
+                payment_settings={"save_default_payment_method": "on_subscription"},
+                metadata={"user_id": str(user.id)}
+            )
+
+            # Persist subscription details on the user
+            updates = {
+                "stripe_subscription_id": subscription.id,
+                "subscription_status": subscription.status,
+                "subscription_plan": price_id,
+                "subscription_start_date": datetime.fromtimestamp(subscription.current_period_start),
+                "subscription_end_date": datetime.fromtimestamp(subscription.current_period_end),
+            }
+            await self.user_db.update(user, updates)
+            logging.info(f"Created trial subscription for user {user.id}: {subscription.id}")
+
+        except Exception as e:
+            # Do not block registration on Stripe issues; just log
+            logging.error(f"Failed to create trial subscription for user {user.id}: {e}")
     
     async def on_after_verify(self, user: User, request: Optional[Request] = None):
         """Called after user email is verified."""
