@@ -429,7 +429,7 @@ async def get_subscription_plans():
 
         plan = {
             "id": price_id,
-            "name": "Millis AI Monthly",
+            "name": "Spark AI Monthly",
             "price": unit_amount / 100.0,
             "currency": currency,
             "interval": "monthly" if interval == "month" else interval,
@@ -447,7 +447,7 @@ async def get_subscription_plans():
         return {
             "plans": [{
                 "id": os.getenv("STRIPE_SINGLE_PLAN_PRICE_ID"),
-                "name": "Millis AI Monthly",
+                "name": "Spark AI Monthly",
                 "price": 499,
                 "currency": "aud",
                 "interval": "monthly",
