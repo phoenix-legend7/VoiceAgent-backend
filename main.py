@@ -75,7 +75,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="Backend API for Ellisia Partner's Voice Agent application",
     version="0.1.0",
-    lifespan=lifespan
+    # lifespan=lifespan
 )
 
 # Add exception handler for inactive users

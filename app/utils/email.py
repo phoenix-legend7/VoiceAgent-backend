@@ -3,6 +3,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
 import logging
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -18,8 +20,9 @@ class EmailService:
         self.from_email = settings.SMTP_FROM_EMAIL
         self.from_name = settings.SMTP_FROM_NAME
         self.use_tls = settings.SMTP_USE_TLS
-        
-    async def send_email(
+        self.executor = ThreadPoolExecutor(max_workers=3)
+    
+    def _send_email_sync(
         self,
         to_email: str,
         subject: str,
@@ -27,7 +30,7 @@ class EmailService:
         text_content: Optional[str] = None
     ) -> bool:
         """
-        Send an email via SMTP.
+        Synchronous email sending function to run in thread pool.
         
         Args:
             to_email: Recipient email address
@@ -54,7 +57,7 @@ class EmailService:
             msg.attach(html_part)
             
             # Connect to SMTP server and send
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+            with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30) as server:
                 if self.use_tls:
                     server.starttls()
                 server.login(self.smtp_username, self.smtp_password)
@@ -66,6 +69,35 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send email to {to_email}: {str(e)}")
             return False
+        
+    async def send_email(
+        self,
+        to_email: str,
+        subject: str,
+        html_content: str,
+        text_content: Optional[str] = None
+    ) -> bool:
+        """
+        Send an email via SMTP (async wrapper).
+        
+        Args:
+            to_email: Recipient email address
+            subject: Email subject
+            html_content: HTML email body
+            text_content: Plain text email body (optional)
+            
+        Returns:
+            True if email sent successfully, False otherwise
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self.executor,
+            self._send_email_sync,
+            to_email,
+            subject,
+            html_content,
+            text_content
+        )
     
     async def send_verification_email(
         self,

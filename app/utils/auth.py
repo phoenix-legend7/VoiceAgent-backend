@@ -79,10 +79,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         await self.user_db.session.commit()
         
         # Send verification email with code
-        await email_service.send_verification_email(
-            to_email=user.email,
-            verification_code=verification_code
-        )
+        try:
+            email_sent = await email_service.send_verification_email(
+                to_email=user.email,
+                verification_code=verification_code
+            )
+            if email_sent:
+                logging.info(f"Verification email sent successfully to {user.email}")
+            else:
+                logging.error(f"Failed to send verification email to {user.email}")
+        except Exception as e:
+            logging.error(f"Exception sending verification email to {user.email}: {str(e)}")
 
         # Create Stripe customer and start 30-day trial subscription automatically on signup
         try:
