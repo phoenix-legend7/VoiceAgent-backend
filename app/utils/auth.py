@@ -84,7 +84,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             verification_code=verification_code
         )
 
-        # Create Stripe customer and start 3-day trial subscription automatically on signup
+        # Create Stripe customer and start 30-day trial subscription automatically on signup
         try:
             stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
             if not stripe.api_key:
@@ -99,15 +99,15 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                 )
                 user = await self.user_db.update(user, {"stripe_customer_id": customer.id})
 
-            # Create subscription with 3-day trial for the single plan
+            # Create subscription with 30-day trial for the single plan (1 agent by default)
             price_id = os.getenv("STRIPE_SINGLE_PLAN_PRICE_ID", "price_1SUfE3H5cS5BXfZcy9EEE8Rq")
 
             subscription = stripe.Subscription.create(
                 customer=user.stripe_customer_id,
-                items=[{"price": price_id}],
-                trial_period_days=3,
+                items=[{"price": price_id, "quantity": 1}],
+                trial_period_days=30,
                 payment_settings={"save_default_payment_method": "on_subscription"},
-                metadata={"user_id": str(user.id)}
+                metadata={"user_id": str(user.id), "agent_quantity": "1"}
             )
 
             # Persist subscription details on the user
@@ -128,6 +128,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                 "stripe_subscription_id": subscription.id,
                 "subscription_status": subscription.status,
                 "subscription_plan": price_id,
+                "subscription_quantity": 1,
                 "subscription_start_date": start_date,
                 "subscription_end_date": end_date,
             }

@@ -37,6 +37,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     subscription_start_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     subscription_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    subscription_quantity: Mapped[Optional[int]] = mapped_column(Float, nullable=True, default=0)  # Number of agents subscribed (A$299 per agent)
     api_keys: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     reset_password_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     reset_password_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

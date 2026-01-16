@@ -38,6 +38,7 @@ class ManualTopupRequest(BaseModel):
 
 class SubscriptionRequest(BaseModel):
     price_id: str  # Stripe price ID for the subscription plan
+    quantity: int = 1  # Number of agents to subscribe (A$299 per agent)
 
 class SubscriptionPlanResponse(BaseModel):
     id: str
@@ -429,14 +430,15 @@ async def get_subscription_plans():
 
         plan = {
             "id": price_id,
-            "name": "Spark AI Monthly",
+            "name": "Spark AI Monthly (Per Agent)",
             "price": unit_amount / 100.0,
             "currency": currency,
             "interval": "monthly" if interval == "month" else interval,
+            "per_agent": True,
             "features": [
-                "Includes 3-day free trial",
+                "Includes 30-day free trial",
                 "Credit-based usage (requires credits)",
-                "Agent access while subscription active",
+                "Each agent requires separate subscription",
                 "Cancel anytime"
             ]
         }
@@ -447,14 +449,15 @@ async def get_subscription_plans():
         return {
             "plans": [{
                 "id": os.getenv("STRIPE_SINGLE_PLAN_PRICE_ID"),
-                "name": "Spark AI Monthly",
-                "price": 499,
+                "name": "Spark AI Monthly (Per Agent)",
+                "price": 299.00,
                 "currency": "aud",
                 "interval": "monthly",
+                "per_agent": True,
                 "features": [
-                    "Includes 3-day free trial",
+                    "Includes 30-day free trial",
                     "Credit-based usage (requires credits)",
-                    "Agent access while subscription active",
+                    "Each agent requires separate subscription",
                     "Cancel anytime"
                 ]
             }]
@@ -483,13 +486,14 @@ async def create_subscription(
                 detail="Please add a payment method before subscribing"
             )
         
-        # Create the subscription
+        # Create the subscription with quantity (one subscription per agent at A$299/month)
         subscription = stripe.Subscription.create(
             customer=user.stripe_customer_id,
-            items=[{"price": request.price_id}],
+            items=[{"price": request.price_id, "quantity": request.quantity}],
             default_payment_method=user.default_payment_method,
             metadata={
-                'user_id': str(user.id)
+                'user_id': str(user.id),
+                'agent_quantity': str(request.quantity)
             }
         )
         
@@ -498,6 +502,7 @@ async def create_subscription(
         user.stripe_subscription_id = subscription.id
         user.subscription_status = subscription.status
         user.subscription_plan = request.price_id
+        user.subscription_quantity = request.quantity
         user.subscription_start_date = datetime.fromtimestamp(subscription.current_period_start)
         user.subscription_end_date = datetime.fromtimestamp(subscription.current_period_end)
         
@@ -618,6 +623,53 @@ async def reactivate_subscription(user: User = Depends(current_active_user)):
     
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/subscription/update-quantity")
+async def update_subscription_quantity(
+    request: SubscriptionRequest,
+    user: User = Depends(current_active_user)
+):
+    """Update subscription quantity based on number of agents (A$299 per agent)"""
+    try:
+        if not user.stripe_subscription_id:
+            raise HTTPException(
+                status_code=400,
+                detail="No active subscription found. Please subscribe first."
+            )
+        
+        # Get the current subscription
+        subscription = stripe.Subscription.retrieve(user.stripe_subscription_id)
+        
+        # Update the quantity on the subscription item
+        stripe.Subscription.modify(
+            user.stripe_subscription_id,
+            items=[{
+                'id': subscription['items']['data'][0].id,
+                'quantity': request.quantity,
+            }],
+            metadata={
+                'user_id': str(user.id),
+                'agent_quantity': str(request.quantity)
+            },
+            proration_behavior='always_invoice',  # Charge immediately for additional agents
+        )
+        
+        # Update user's subscription quantity
+        user.subscription_quantity = request.quantity
+        await save_user(user)
+        
+        return {
+            "success": True,
+            "message": f"Subscription updated to {request.quantity} agent(s) at A${299 * request.quantity}/month",
+            "quantity": request.quantity,
+            "monthly_cost": 299 * request.quantity
+        }
+    
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"Error updating subscription quantity: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/subscription/webhook")
 async def handle_subscription_webhook(webhook_data: WebhookData):

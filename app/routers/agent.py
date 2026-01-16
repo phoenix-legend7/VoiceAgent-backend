@@ -83,6 +83,25 @@ async def get_agents_db(db: AsyncSession = Depends(get_db), user = Depends(curre
 
 @router.post("/")
 async def create_agent(agent: AgentCreate, db: AsyncSession = Depends(get_db), user = Depends(current_active_user)):
+    # Check if user has active subscription
+    if not user.subscription_status or user.subscription_status not in ["active", "trialing"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Active subscription required to create agents. Please subscribe at A$299 per agent per month."
+        )
+    
+    # Count current agents
+    result = await db.execute(select(Agent).where(Agent.user_id == user.id))
+    current_agent_count = len(result.scalars().all())
+    
+    # Check if user has enough subscription quantity for another agent
+    subscription_quantity = user.subscription_quantity or 0
+    if current_agent_count >= subscription_quantity:
+        raise HTTPException(
+            status_code=403,
+            detail=f"You have {current_agent_count} agent(s) but only {subscription_quantity} subscription slot(s). Please upgrade your subscription to add more agents at A$299 per agent per month."
+        )
+    
     async with httpx.AsyncClient() as client:
         try:
             headers = get_httpx_headers()
