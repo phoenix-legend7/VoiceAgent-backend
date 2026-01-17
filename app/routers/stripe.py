@@ -436,7 +436,7 @@ async def get_subscription_plans():
             "interval": "monthly" if interval == "month" else interval,
             "per_agent": True,
             "features": [
-                "Includes 30-day free trial",
+                "30-day free trial on platform (first subscription only)",
                 "Credit-based usage (requires credits)",
                 "Each agent requires separate subscription",
                 "Cancel anytime"
@@ -455,7 +455,7 @@ async def get_subscription_plans():
                 "interval": "monthly",
                 "per_agent": True,
                 "features": [
-                    "Includes 30-day free trial",
+                    "30-day free trial on platform (first subscription only)",
                     "Credit-based usage (requires credits)",
                     "Each agent requires separate subscription",
                     "Cancel anytime"
@@ -486,16 +486,23 @@ async def create_subscription(
                 detail="Please add a payment method before subscribing"
             )
         
-        # Create the subscription with quantity (one subscription per agent at A$299/month)
-        subscription = stripe.Subscription.create(
-            customer=user.stripe_customer_id,
-            items=[{"price": request.price_id, "quantity": request.quantity}],
-            default_payment_method=user.default_payment_method,
-            metadata={
+        # Determine if this is the user's first subscription (platform trial)
+        is_first_subscription = not user.stripe_subscription_id
+
+        subscription_params = {
+            "customer": user.stripe_customer_id,
+            "items": [{"price": request.price_id, "quantity": request.quantity}],
+            "default_payment_method": user.default_payment_method,
+            "metadata": {
                 'user_id': str(user.id),
                 'agent_quantity': str(request.quantity)
             }
-        )
+        }
+
+        if is_first_subscription:
+            subscription_params["trial_period_days"] = 30
+        
+        subscription = stripe.Subscription.create(**subscription_params)
         
         # Update user subscription info
         from datetime import datetime
